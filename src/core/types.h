@@ -7,13 +7,33 @@
 
 #include <vector>
 
+// internal bases are stored in 4-bit values.
+
 namespace moss {
+    enum class IUPAC_nuc : std::uint8_t {
+        EQ, A, C, M, G, R, S, V, T, W, Y, H, K, D, B, N
+    };
+
     typedef struct {
         uint8_t base;
         int qual;
     } Read;
 
-    using ReadColumns = std::vector<std::vector<Read>>;
+    class Pileups {
+    private:
+        uint8_t ref;
+        std::vector<std::vector<Read> > read_columns;
+    public:
+        explicit Pileups(int num_samples);
+
+        void set_ref(char ref);
+
+        void emplace_read_column(std::vector<Read> &col);
+
+        const std::vector<std::vector<Read>> &get_read_columns() const;
+
+        uint8_t get_ref() const;
+    };
 
 //    class ReadsColumn {
 //    private:

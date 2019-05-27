@@ -3,18 +3,12 @@
 #include <vector>
 #include <sys/stat.h>
 #include "io/bam_io.h"
+#include "core/SnvCaller.h"
+#include "core/types.h"
 
-/* Flag set by ‘--verbose’. */
-const int FATAL = 1;
-static int verbose_flag;
 
 const option long_options[] =
         {
-                /* These options set a flag. */
-                {"verbose", no_argument,       &verbose_flag, 1},
-                {"brief",   no_argument,       &verbose_flag, 0},
-                /* These options don’t set a flag.
-                   We distinguish them by their indices. */
                 {"bam",     required_argument, nullptr,       'b'},
                 {"ref",     required_argument, nullptr,       'r'},
                 {"loci",    required_argument, nullptr,       'l'},
@@ -97,12 +91,6 @@ int main(int argc, char **argv) {
         }
     }
 
-    /* Instead of reporting ‘--verbose’
-       and ‘--brief’ as they are encountered,
-       we report the final status resulting from them. */
-    if (verbose_flag)
-        puts("verbose flag is set");
-
     /* Print any remaining command line arguments (not options). */
     if (optind < argc) {
         printf("non-option ARGV-elements: ");
@@ -111,15 +99,21 @@ int main(int argc, char **argv) {
         putchar('\n');
     }
 
+    if (!is_file_exist(ref_file)) {
+        std::cerr << "Error: Failed to open reference file " << ref_file << std::endl;
+        return 1;
+    } else {
+        std::cout << "Reference FASTA file: " << ref_file << std::endl;
+    }
     std::cout << "BAM files:\t";
     for (const std::string &bamFile : bam_files) {
         std::string indexFile = bamFile + ".bai";
         if (!is_file_exist(bamFile)) {
             std::cerr << "Error: Failed to open BAM file " << bamFile << std::endl;
-            return FATAL;
+            return 1;
         } else if (!is_file_exist(indexFile)) {
             std::cerr << "Error: Failed to open index file " << indexFile << std::endl;
-            return FATAL;
+            return 1;
         }
         std::cout << bamFile << '\t';
     }
@@ -127,19 +121,23 @@ int main(int argc, char **argv) {
     for (const auto &lociFile : loci_files) {
         std::cout << lociFile << '\t';
     }
-    std::cout << tau << std::endl;
+    std::cout << "tau = " << tau << std::endl;
 
     // TODO: use htslib to parse files
     // TODO: merge loci files
-    moss::BamStreamer streamer(bam_files);
-    moss::ReadColumns col = streamer.get_column("demo20", 990);
-    for (const auto &reads : col) {
+    moss::SnvCaller caller(4);
+    moss::BamStreamer streamer(ref_file, bam_files);
+    moss::Pileups col = streamer.get_column("demo20", 990);
+    auto array = col.get_read_columns();
+    caller.likelihood(std::vector<std::vector<moss::Read>>(array.begin() + 1, array.end()), col.get_ref(),
+                      (uint8_t(0x0f) & ~col.get_ref()));
+    for (const auto &reads : col.get_read_columns()) {
         std::cout << reads.size() << ' ';
         for (const auto &r : reads) {
-            std::cout << r.base << ':' << r.qual << ' ';
+            std::cout << static_cast<char>(seq_nt16_str[r.base]) << ':' << r.qual << ' ';
         }
         std::cout << std::endl;
     }
-
+//    std::unordered_set<uint8_t> normal_gt = caller.normal_calling(col.get_read_columns()[0], col.get_ref());
     exit(0);
 }
