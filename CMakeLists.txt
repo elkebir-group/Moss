@@ -15,3 +15,10 @@ set(OBJ src/main.cpp src/io/bam_io.cpp src/io/bam_io.h src/core/types.h src/core
 add_executable(moss ${OBJ})
 target_include_directories (moss PUBLIC ${HTSlib_INCLUDE_DIRS})
 target_link_libraries (moss ${HTSlib_LIBRARIES})
+
+set(TEST_DIR test)
+set(TEST_FILES ${TEST_DIR}/types_tests.cpp ${TEST_DIR}/catch.hpp ${TEST_DIR}/SnvCaller_tests.cpp src/core/SnvCaller.cpp src/core/types.cpp)
+
+add_executable(test ${TEST_FILES})
+target_include_directories(test PUBLIC ${HTSlib_INCLUDE_DIRS})
+target_link_libraries(test ${HTSlib_LIBRARIES})
