@@ -13,6 +13,9 @@ inline uint8_t set_difference(uint8_t a, uint8_t b) {
     return a & ~b;
 }
 
+unsigned count_1bits[16] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
+
+// TODO: limiting number of tumor samples?
 SnvCaller::SnvCaller(int n_tumor_sample, double mu, double stepSize) : n_tumor_sample(n_tumor_sample), mu(mu),
                                                                        stepSize(stepSize) {
     gridSize = static_cast<int>(1 / stepSize + 1);
@@ -137,11 +140,59 @@ double SnvCaller::calling(Pileups pile, uint8_t &normal_gt, uint8_t &tumor_gt) {
     const std::vector<std::vector<Read>> &columns = pile.get_read_columns();
     uint8_t ref = pile.get_ref();
     normal_gt = normal_calling(columns[0], ref);
+    uint8_t tumor_bases = set_difference(0x0f, ref);
     Array3D lhood = likelihood(std::vector<std::vector<moss::Read>>(columns.begin() + 1, columns.end()), ref,
-                               set_difference(0x0f, ref));
+                               tumor_bases);
+    unsigned int n_tumor_bases = count_1bits[tumor_bases];
 
-    // integral
-    auto aa = log_sum_exp(lhood[0][0]);
+    // pre-compute integral of log likelihood under z = 0, 1
+    // integral over frequency, P(D_i | Z_i=z_i, Gn)
+    std::vector<std::vector<double> > llh_integral(n_tumor_sample);
+    int idx_sample = 0;
+    for (const auto &sample : lhood) {
+        int idx_base = 0;
+        llh_integral[idx_sample].resize(n_tumor_bases);
+        for (const auto &sample_base : sample) {
+            llh_integral[idx_sample][idx_base] = log_sum_exp(sample_base) + logUniform;
+            idx_base++;
+        }
+        idx_sample++;
+    }
+    // sum over 2^m-1 of z, and tumor nucleotide
+    double nume = 0,
+        deno = 0,
+        max_tumor_evidence = 0;
+    int tumor_gt_idx;
+    for (int idx_nuc = 0; idx_nuc < n_tumor_bases; ++idx_nuc) {
+        double evidence = 0;
+        for (int z = 0; z < (1 << n_tumor_sample); ++z) {
+            double llh = 0;
+            for (int idx_sample = 0; idx_sample < n_tumor_sample; ++idx_sample) {
+                int z_sample = (z >> idx_sample) & 1;
+                llh += z_sample ? llh_integral[idx_sample][idx_nuc] : lhood[idx_sample][idx_nuc][0];
+            }
+            if (z == 0) {
+                double temp = exp(llh + logMu);
+                nume += temp;
+                evidence += temp;
+            } else {
+                evidence += exp(llh + logPriorZComplement);
+            }
+            if (max_tumor_evidence <= evidence) {
+                max_tumor_evidence = evidence;
+                // TODO: tumor_gt =
+                tumor_gt_idx = idx_nuc;
+            }
+            deno += evidence;
+        }
+    }
+    double log_prob_non_soma;
+    if (nume > 0) {
+        log_prob_non_soma = log(nume) - log(deno);
+    } else {
+        log_prob_non_soma = float('-inf');
+    }
+    return log_prob_non_soma;
 }
 
 double moss::qphred2prob(int qphred) {
@@ -173,8 +224,16 @@ double moss::trinomial(unsigned int s, unsigned int k, unsigned int t) {
 
 template<typename T>
 T moss::log_sum_exp(std::vector<T> array) {
-    auto max_elem = *std::max_element(array.begin(), array.end());
-    auto sum = std::accumulate(array.begin(), array.end(), T{},
-                               [max_elem](T a, T b) { return a + exp(b - max_elem); });
-    return max_elem + log(sum);
+    T max_elem = -std::numeric_limits<T>::infinity(),
+        accum{};
+    for (const auto &item : array) {
+        if (item >= max_elem) {
+            accum *= exp(max_elem - item);
+            accum += 1.f;
+            max_elem = item;
+        } else {
+            accum += exp(item - max_elem);
+        }
+    }
+    return max_elem + log(accum);
 }

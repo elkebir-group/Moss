@@ -129,15 +129,7 @@ int main(int argc, char **argv) {
     moss::BamStreamer streamer(ref_file, bam_files);
     moss::Pileups col = streamer.get_column("demo20", 990);
     auto array = col.get_read_columns();
-    caller.likelihood(std::vector<std::vector<moss::Read>>(array.begin() + 1, array.end()), col.get_ref(),
-                      (uint8_t(0x0f) & ~col.get_ref()));
-    for (const auto &reads : col.get_read_columns()) {
-        std::cout << reads.size() << ' ';
-        for (const auto &r : reads) {
-            std::cout << static_cast<char>(seq_nt16_str[r.base]) << ':' << r.qual << ' ';
-        }
-        std::cout << std::endl;
-    }
-//    std::unordered_set<uint8_t> normal_gt = caller.normal_calling(col.get_read_columns()[0], col.get_ref());
+    uint8_t normal, tumor;
+    std::cout<< "Prob: " << -10 * caller.calling(col, normal, tumor) << std::endl;
     exit(0);
 }
