@@ -5,6 +5,7 @@
 #include "io/bam_io.h"
 #include "core/SnvCaller.h"
 #include "core/types.h"
+#include <array>
 
 
 const option long_options[] =
@@ -127,9 +128,13 @@ int main(int argc, char **argv) {
     // TODO: merge loci files
     moss::SnvCaller caller(4);
     moss::BamStreamer streamer(ref_file, bam_files);
-    moss::Pileups col = streamer.get_column("demo20", 990);
+    std::array<int, 10> pos = {583, 631, 726, 760, 961, 990, 1270, 1507, 1705, 1743};
+    auto p = pos[4];
+    moss::Pileups col = streamer.get_column("demo20", p);
     auto array = col.get_read_columns();
-    uint8_t normal, tumor;
-    std::cout<< "Prob: " << -10 * caller.calling(col, normal, tumor) << std::endl;
+    moss::BaseSet normal;
+    uint8_t tumor;
+    auto log_proba_non_soma = caller.calling(col, normal, tumor);
+    std::cout<< "Pos: " << p << '\t' << "Prob: " << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << std::endl;
     exit(0);
 }

@@ -5,13 +5,8 @@
 #include "SnvCaller.h"
 #include <cmath>
 #include <map>
-#include <numeric>
 
 using namespace moss;
-
-inline uint8_t set_difference(uint8_t a, uint8_t b) {
-    return a & ~b;
-}
 
 unsigned count_1bits[16] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
 
@@ -26,7 +21,7 @@ SnvCaller::SnvCaller(int n_tumor_sample, double mu, double stepSize) : n_tumor_s
     eps = 0.1;
 }
 
-uint8_t SnvCaller::normal_calling(std::vector<Read> column, uint8_t ref) {
+BaseSet SnvCaller::normal_calling(std::vector<Read> column, uint8_t ref) {
     std::map<uint8_t, int> count;
     for (const auto &r : column) {
         count[r.base]++;
@@ -34,18 +29,17 @@ uint8_t SnvCaller::normal_calling(std::vector<Read> column, uint8_t ref) {
     for (const auto &c : count) {
         if ((c.first & ref) != 0) {
             if (abs(c.second / static_cast<double>(column.size()) - 0.5) <= eps) {
-                return c.first | ref;
+                return BaseSet(c.first | ref);
             } else if (1 - eps <= c.second / static_cast<double>(column.size())) {
-                return c.first;
+                return BaseSet(c.first);
             }
         }
     }
-    return ref;
+    return BaseSet(ref);
 }
 
 Array3D
-SnvCaller::likelihood(std::vector<std::vector<Read>> aligned, std::unordered_set<uint8_t> normal_bases,
-                      std::unordered_set<uint8_t> tumor_base) {
+SnvCaller::likelihood(std::vector<std::vector<Read>> aligned, BaseSet normal_bases, BaseSet tumor_base) {
     // pre-calculate
     auto n_gt = tumor_base.size();
     auto p_err = new double *[n_tumor_sample];
@@ -61,10 +55,10 @@ SnvCaller::likelihood(std::vector<std::vector<Read>> aligned, std::unordered_set
         int idx_read = 0;
         for (auto r = sample.begin(); r != sample.end(); ++r, ++idx_read) {
             p_err[idx_sample][idx_read] = qphred2prob(r->qual);
-            is_normal[idx_sample][idx_read] = normal_bases.count(r->base) > 0;
+            is_normal[idx_sample][idx_read] = normal_bases.contain(r->base);
             n_normal[idx_sample] += is_normal[idx_sample][idx_read] ? 1 : 0;
             int idx_base = 0;
-            for (const auto &tumorBase : tumor_base) {
+            for (const auto &tumorBase : tumor_base.get_base_list()) {
                 bool eq = r->base == tumorBase;
                 is_tumor[idx_sample][idx_read * n_gt + idx_base] = eq;
                 n_tumor[idx_sample * n_gt + idx_base] += eq ? 1 : 0;
@@ -81,7 +75,7 @@ SnvCaller::likelihood(std::vector<std::vector<Read>> aligned, std::unordered_set
         std::vector<std::vector<double>> sample_llh_2d;
         sample_llh_2d.reserve(tumor_base.size());
         int idx_base = 0;
-        for (const auto &base : tumor_base) {
+        for (const auto &base : tumor_base.get_base_list()) {
             std::vector<double> base_llh_1d;
             base_llh_1d.reserve(gridSize);
             for (int i = 0; i < gridSize; ++i) {
@@ -123,27 +117,13 @@ SnvCaller::likelihood(std::vector<std::vector<Read>> aligned, std::unordered_set
     return loglikelihood_3d;
 }
 
-Array3D SnvCaller::likelihood(std::vector<std::vector<Read>> aligned, uint8_t normal_bases, uint8_t tumor_base) {
-    std::unordered_set<uint8_t> normal, tumor;
-    for (int i = 0; i < 4; ++i) {
-        if (normal_bases & (1 << i)) {
-            normal.insert(static_cast<uint8_t >(1 << i));
-        }
-        if (tumor_base & (1 << i)) {
-            tumor.insert(static_cast<uint8_t >(1 << i));
-        }
-    }
-    return SnvCaller::likelihood(aligned, normal, tumor);
-}
-
-double SnvCaller::calling(Pileups pile, uint8_t &normal_gt, uint8_t &tumor_gt) {
+double SnvCaller::calling(Pileups pile, BaseSet &normal_gt, uint8_t &tumor_gt) {
     const std::vector<std::vector<Read>> &columns = pile.get_read_columns();
     uint8_t ref = pile.get_ref();
     normal_gt = normal_calling(columns[0], ref);
-    uint8_t tumor_bases = set_difference(0x0f, ref);
-    Array3D lhood = likelihood(std::vector<std::vector<moss::Read>>(columns.begin() + 1, columns.end()), ref,
+    BaseSet tumor_bases = BaseSet::set_difference(0x0f_8, ref);
+    Array3D lhood = likelihood(std::vector<std::vector<moss::Read>>(columns.begin() + 1, columns.end()), normal_gt,
                                tumor_bases);
-    unsigned int n_tumor_bases = count_1bits[tumor_bases];
 
     // pre-compute integral of log likelihood under z = 0, 1
     // integral over frequency, P(D_i | Z_i=z_i, Gn)
@@ -151,7 +131,7 @@ double SnvCaller::calling(Pileups pile, uint8_t &normal_gt, uint8_t &tumor_gt) {
     int idx_sample = 0;
     for (const auto &sample : lhood) {
         int idx_base = 0;
-        llh_integral[idx_sample].resize(n_tumor_bases);
+        llh_integral[idx_sample].resize(tumor_bases.size());
         for (const auto &sample_base : sample) {
             llh_integral[idx_sample][idx_base] = log_sum_exp(sample_base) + logUniform;
             idx_base++;
@@ -163,7 +143,8 @@ double SnvCaller::calling(Pileups pile, uint8_t &normal_gt, uint8_t &tumor_gt) {
         deno = 0,
         max_tumor_evidence = 0;
     int tumor_gt_idx;
-    for (int idx_nuc = 0; idx_nuc < n_tumor_bases; ++idx_nuc) {
+    int idx_nuc = 0;
+    for (const auto &tumor_base : tumor_bases.get_base_list()) {
         double evidence = 0;
         for (int z = 0; z < (1 << n_tumor_sample); ++z) {
             double llh = 0;
@@ -180,11 +161,12 @@ double SnvCaller::calling(Pileups pile, uint8_t &normal_gt, uint8_t &tumor_gt) {
             }
             if (max_tumor_evidence <= evidence) {
                 max_tumor_evidence = evidence;
-                // TODO: tumor_gt =
+                tumor_gt = tumor_base;
                 tumor_gt_idx = idx_nuc;
             }
             deno += evidence;
         }
+        idx_nuc++;
     }
     double log_prob_non_soma;
     if (nume > 0) {
@@ -218,7 +200,7 @@ double moss::binom(unsigned int n, unsigned int k) {
     return bin;
 }
 
-double moss::trinomial(unsigned int s, unsigned int k, unsigned int t) {
+double moss::trinomial(unsigned long s, unsigned long k, unsigned long t) {
     return binom(s + k + t, t) * binom(s + k, k);
 }
 

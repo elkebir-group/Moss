@@ -171,10 +171,6 @@ Pileups BamStreamer::get_column(std::string contig, int locus) {
                                      base_qual});
                     }
                 }
-//                std::cout << meta[j][0]->header->target_name[tid_arr[j]] << '\t' << pos_arr[j] + 1 << '\t'
-//                          << n_plp_arr[j] << std::endl;
-//                print_pileup_seq(plp_arr[j], n_plp_arr[j]);
-//                std::cout << std::endl;
                 break;
             }
         }

@@ -14,6 +14,50 @@ namespace moss {
         EQ, A, C, M, G, R, S, V, T, W, Y, H, K, D, B, N
     };
 
+    inline std::uint8_t operator "" _8(unsigned long long value) {
+        return static_cast<std::uint8_t>(value);
+    }
+
+    class BaseSet {
+    private:
+        uint8_t set;
+        std::vector<uint8_t> base_list;
+        static const unsigned count_1bits[16];
+    public:
+        BaseSet() = default;
+
+        explicit BaseSet(uint8_t base);
+
+        unsigned size();
+
+        bool contain(uint8_t nuc);
+
+        uint8_t get_set();
+
+        const std::vector<uint8_t> &get_base_list();
+
+        static BaseSet set_difference(uint8_t a, uint8_t b);
+
+        BaseSet complement();
+    };
+
+    inline unsigned moss::BaseSet::size() {
+        return count_1bits[set];
+    }
+
+    inline bool BaseSet::contain(uint8_t nuc) {
+        return (set & nuc) != 0;
+    }
+
+    inline BaseSet BaseSet::set_difference(uint8_t a, uint8_t b) {
+        return BaseSet(a & ~b);
+    }
+
+    inline BaseSet BaseSet::complement() {
+        return BaseSet(0x0f_8 & ~set);
+    }
+
+
     typedef struct {
         uint8_t base;
         int qual;

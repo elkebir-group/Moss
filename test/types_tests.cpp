@@ -6,6 +6,8 @@
 #include "../src/core/types.h"
 #include "htslib/hts.h"
 
+using namespace Catch;
+
 TEST_CASE("IUPAC notation defined", "[types]") {
     REQUIRE(static_cast<uint8_t>(moss::IUPAC_nuc::EQ) == 0);
     REQUIRE(static_cast<uint8_t>(moss::IUPAC_nuc::A) == 1);
@@ -39,4 +41,38 @@ TEST_CASE("IUPAC notation defined", "[types]") {
     REQUIRE(seq_nt16_str[static_cast<uint8_t>(moss::IUPAC_nuc::D)] == 'D');
     REQUIRE(seq_nt16_str[static_cast<uint8_t>(moss::IUPAC_nuc::B)] == 'B');
     REQUIRE(seq_nt16_str[static_cast<uint8_t>(moss::IUPAC_nuc::N)] == 'N');
+}
+
+TEST_CASE("BaseSet", "[types]") {
+    using moss::operator""_8;
+    auto set = moss::BaseSet(static_cast<uint8_t>(moss::IUPAC_nuc::M));
+
+    REQUIRE(set.size() == 2);
+    REQUIRE(set.contain(static_cast<uint8_t>(moss::IUPAC_nuc::A)));
+    REQUIRE(set.contain(static_cast<uint8_t>(moss::IUPAC_nuc::C)));
+
+    REQUIRE(moss::BaseSet(0x00_8).size() == 0);
+    REQUIRE(moss::BaseSet(0x01_8).size() == 1);
+    REQUIRE(moss::BaseSet(0x02_8).size() == 1);
+    REQUIRE(moss::BaseSet(0x03_8).size() == 2);
+    REQUIRE(moss::BaseSet(0x04_8).size() == 1);
+    REQUIRE(moss::BaseSet(0x05_8).size() == 2);
+    REQUIRE(moss::BaseSet(0x06_8).size() == 2);
+    REQUIRE(moss::BaseSet(0x07_8).size() == 3);
+    REQUIRE(moss::BaseSet(0x08_8).size() == 1);
+    REQUIRE(moss::BaseSet(0x09_8).size() == 2);
+    REQUIRE(moss::BaseSet(0x0A_8).size() == 2);
+    REQUIRE(moss::BaseSet(0x0B_8).size() == 3);
+    REQUIRE(moss::BaseSet(0x0C_8).size() == 2);
+    REQUIRE(moss::BaseSet(0x0D_8).size() == 3);
+    REQUIRE(moss::BaseSet(0x0E_8).size() == 3);
+    REQUIRE(moss::BaseSet(0x0F_8).size() == 4);
+
+    auto difference = moss::BaseSet::set_difference(0x0c_8, 0x0a_8);
+    REQUIRE(difference.get_set() == 0x04_8);
+    REQUIRE_THAT(difference.get_base_list(), Equals(std::vector<uint8_t>({0x04_8})));
+
+    auto comple = moss::BaseSet(0x06_8).complement();
+    REQUIRE(comple.get_set() == 0x09_8);
+    REQUIRE_THAT(comple.get_base_list(), Equals(std::vector<uint8_t>({0x01_8, 0x08_8})));
 }
