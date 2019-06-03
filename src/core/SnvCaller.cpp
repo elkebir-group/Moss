@@ -16,7 +16,7 @@ SnvCaller::SnvCaller(int n_tumor_sample, double mu, double stepSize) : n_tumor_s
     gridSize = static_cast<int>(1 / stepSize + 1);
     logNoisePriorComplement = log(1 - mu);
     logPriorZComplement = logNoisePriorComplement - log((1 << n_tumor_sample) - 1);
-    logMu = log1p(mu);
+    logMu = log1p(mu - 1);
     logUniform = -log(gridSize - 1);
     eps = 0.1;
 }
