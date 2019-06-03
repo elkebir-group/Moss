@@ -17,8 +17,36 @@ namespace moss {
 
     double trinomial(unsigned long s, unsigned long k, unsigned long t);
 
+    /*!
+     * perform log sum exp trick in one pass
+     * @tparam T : numerical that supports add and log
+     * @param array : array of log values
+     * @return log summation
+     */
     template<typename T>
     T log_sum_exp(std::vector<T> array);
+
+    /*!
+     * Initialize max_elem to be -infinity, return accumulate.
+     * @tparam T
+     * @param max_elem
+     * @return accumulate
+     */
+    template<typename T>
+    T &log_sum_exp_init(T &max_elem);
+
+    /*!
+     * Single iteration of log sum exp trick.
+     * @tparam T
+     * @param max_elem
+     * @param accum
+     * @param item
+     */
+    template<typename T>
+    void log_sum_exp_iter(T &max_elem, T &accum, T item);
+
+    template<typename T>
+    T log_sum_exp_final(T &max_elem, T &accum);
 
     class SnvCaller {
     private:

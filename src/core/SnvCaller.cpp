@@ -139,13 +139,16 @@ double SnvCaller::calling(Pileups pile, BaseSet &normal_gt, uint8_t &tumor_gt) {
         idx_sample++;
     }
     // sum over 2^m-1 of z, and tumor nucleotide
-    double nume = 0,
-        deno = 0,
-        max_tumor_evidence = 0;
+    double max_nume_elem,
+        max_deno_elem,
+        max_tumor_evidence = -std::numeric_limits<double>::infinity(),
+        max_evidence_elem;
+    double nume = log_sum_exp_init(max_nume_elem);
+    double deno = log_sum_exp_init(max_deno_elem);
     int tumor_gt_idx;
     int idx_nuc = 0;
     for (const auto &tumor_base : tumor_bases.get_base_list()) {
-        double evidence = 0;
+        double evidence = log_sum_exp_init(max_evidence_elem);
         for (int z = 0; z < (1 << n_tumor_sample); ++z) {
             double llh = 0;
             for (int idx_sample = 0; idx_sample < n_tumor_sample; ++idx_sample) {
@@ -153,27 +156,23 @@ double SnvCaller::calling(Pileups pile, BaseSet &normal_gt, uint8_t &tumor_gt) {
                 llh += z_sample ? llh_integral[idx_sample][idx_nuc] : lhood[idx_sample][idx_nuc][0];
             }
             if (z == 0) {
-                double temp = exp(llh + logMu);
-                nume += temp;
-                evidence += temp;
+                double temp = llh + logMu;
+                log_sum_exp_iter(max_nume_elem, nume, temp);
+                log_sum_exp_iter(max_evidence_elem, evidence, temp);
             } else {
-                evidence += exp(llh + logPriorZComplement);
+                log_sum_exp_iter(max_evidence_elem, evidence, llh + logPriorZComplement);
             }
-            if (max_tumor_evidence <= evidence) {
-                max_tumor_evidence = evidence;
-                tumor_gt = tumor_base;
-                tumor_gt_idx = idx_nuc;
-            }
-            deno += evidence;
         }
+        evidence = log_sum_exp_final(max_evidence_elem, evidence);
+        if (max_tumor_evidence <= evidence) {
+            max_tumor_evidence = evidence;
+            tumor_gt = tumor_base;
+            tumor_gt_idx = idx_nuc;
+        }
+        log_sum_exp_iter(max_deno_elem, deno, evidence);
         idx_nuc++;
     }
-    double log_prob_non_soma;
-    if (nume > 0) {
-        log_prob_non_soma = log(nume) - log(deno);
-    } else {
-        log_prob_non_soma = float('-inf');
-    }
+    double log_prob_non_soma = log_sum_exp_final(max_nume_elem, nume) - log_sum_exp_final(max_deno_elem, deno);
     return log_prob_non_soma;
 }
 
@@ -217,5 +216,28 @@ T moss::log_sum_exp(std::vector<T> array) {
             accum += exp(item - max_elem);
         }
     }
+    return max_elem + log(accum);
+}
+
+template<typename T>
+T &moss::log_sum_exp_init(T &max_elem) {
+    max_elem = -std::numeric_limits<T>::infinity();
+    T ret{};
+    return ret;
+}
+
+template<typename T>
+void moss::log_sum_exp_iter(T &max_elem, T &accum, T item) {
+    if (item >= max_elem) {
+        accum *= exp(max_elem - item);
+        accum += 1.f;
+        max_elem = item;
+    } else {
+        accum += exp(item - max_elem);
+    }
+}
+
+template<typename T>
+T moss::log_sum_exp_final(T &max_elem, T &accum) {
     return max_elem + log(accum);
 }
