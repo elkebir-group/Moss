@@ -46,7 +46,6 @@ namespace moss {
     private:
         unsigned long num_samples;
         std::vector<data_t **> meta;
-        std::vector<bam_mplp_t> bam_handler;
         plp_fp pileup_func;
         int min_base_qual;
         std::string reference;

@@ -24,7 +24,6 @@ BamStreamer::BamStreamer(std::string ref_file_name, std::vector<std::string> bam
     num_samples = bam_file_names.size();
     ref_fp = fai_load(reference.c_str());
     meta.reserve(num_samples);
-    bam_handler.reserve(num_samples);
     htsFormat fmt = {};
     for (const std::string &bamFile : bam_file_names) {
         samFile *fp = sam_open_format(bamFile.c_str(), "rb", &fmt);
@@ -61,9 +60,6 @@ BamStreamer::~BamStreamer() {
         }
         delete[](item[0]);
         delete[](item);
-    }
-    for (auto &handler : bam_handler) {
-        bam_mplp_destroy(handler);
     }
 }
 
@@ -141,6 +137,8 @@ Pileups BamStreamer::get_column(std::string contig, int locus) {
     }
 
     int max_depth = INT_MAX;
+    std::vector<bam_mplp_t> bam_handler;
+    bam_handler.reserve(num_samples);
     for (int j = 0; j < num_samples; ++j) {
         bam_handler.emplace_back(bam_mplp_init(1, pileup_func, (void **) (meta[j])));
         bam_mplp_init_overlaps(bam_handler.back());
@@ -175,6 +173,12 @@ Pileups BamStreamer::get_column(std::string contig, int locus) {
             }
         }
         read_col.emplace_read_column(reads);
+    }
+    for (int j = 0; j < num_samples; ++j) {
+        sam_itr_destroy(meta[j][0]->iter);
+    }
+    for (auto &handler : bam_handler) {
+        bam_mplp_destroy(handler);
     }
     delete[](tid_arr);
     delete[](pos_arr);
