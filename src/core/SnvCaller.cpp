@@ -11,6 +11,7 @@ using namespace moss;
 unsigned count_1bits[16] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
 
 // TODO: limiting number of tumor samples?
+// - Use custom arbitrary long binary indicator?
 SnvCaller::SnvCaller(int n_tumor_sample, double mu, double stepSize) : n_tumor_sample(n_tumor_sample), mu(mu),
                                                                        stepSize(stepSize) {
     gridSize = static_cast<int>(1 / stepSize + 1);
@@ -117,7 +118,7 @@ SnvCaller::likelihood(std::vector<std::vector<Read>> aligned, BaseSet normal_bas
     return loglikelihood_3d;
 }
 
-double SnvCaller::calling(Pileups pile, BaseSet &normal_gt, uint8_t &tumor_gt) {
+double SnvCaller::calling(Pileups pile, BaseSet &normal_gt, uint8_t &tumor_gt, unsigned long &Z) {
     const std::vector<std::vector<Read>> &columns = pile.get_read_columns();
     uint8_t ref = pile.get_ref();
     normal_gt = normal_calling(columns[0], ref);
@@ -171,6 +172,12 @@ double SnvCaller::calling(Pileups pile, BaseSet &normal_gt, uint8_t &tumor_gt) {
         }
         log_sum_exp_iter(max_deno_elem, deno, evidence);
         idx_nuc++;
+    }
+    Z = 0;
+    for (int i = 0; i < n_tumor_sample; ++i) {
+        if (lhood[i][tumor_gt_idx][0] < llh_integral[i][tumor_gt_idx]) {
+            Z |= (1 << i);
+        }
     }
     double log_prob_non_soma = log_sum_exp_final(max_nume_elem, nume) - log_sum_exp_final(max_deno_elem, deno);
     return log_prob_non_soma;

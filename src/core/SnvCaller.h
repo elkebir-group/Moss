@@ -71,9 +71,18 @@ namespace moss {
 
         SnvCaller(int n_tumor_sample, double mu = 1.0 - 5e-6, double stepSize = 0.05);
 
+        /*!
+         * Calculate log likelihood of each samples given tumor base and VAF,
+         * P( D_j | f_j, z_j, g_t, g_n).
+         * Return a 3D vector of size n_tumor_sample x n_tumor_base x gridSize
+         * @param aligned : aligned columns of tumor samples
+         * @param normal_bases : base set of normal given by normal_calling
+         * @param tumor_base : return MLE tumor base
+         * @return : 3D vector
+         */
         Array3D likelihood(std::vector<std::vector<Read>> aligned, BaseSet normal_bases, BaseSet tumor_base);
 
-        double calling(Pileups pile, BaseSet &normal_gt, uint8_t &tumor_gt);
+        double calling(Pileups pile, BaseSet &normal_gt, uint8_t &tumor_gt, unsigned long &Z);
     };
 }
 

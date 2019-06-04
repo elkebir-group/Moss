@@ -124,9 +124,9 @@ int main(int argc, char **argv) {
     }
     std::cout << "tau = " << tau << std::endl;
 
-    // TODO: use htslib to parse files
     // TODO: merge loci files
-    moss::SnvCaller caller(4);
+    unsigned long num_tumor_samples = bam_files.size() - 1;
+    moss::SnvCaller caller(num_tumor_samples);
     moss::BamStreamer streamer(ref_file, bam_files);
     std::array<int, 10> pos = {583, 631, 726, 760, 961, 990, 1270, 1507, 1705, 1743};
     for (auto &p : pos) {
@@ -134,8 +134,11 @@ int main(int argc, char **argv) {
         auto array = col.get_read_columns();
         moss::BaseSet normal;
         uint8_t tumor;
-        auto log_proba_non_soma = caller.calling(col, normal, tumor);
-        std::cout<< "Pos: " << p << '\t' << "Prob: " << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << std::endl;
+        unsigned long Z;
+        auto log_proba_non_soma = caller.calling(col, normal, tumor, Z);
+        std::string states(std::bitset<sizeof(Z)>(Z).to_string());
+        std::cout << "Pos: " << p << '\t' << "Prob: " << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << '\t'
+                  << states.substr(states.size()-4, 4) << std::endl;
     }
     exit(0);
 }
