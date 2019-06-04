@@ -10,14 +10,29 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/build/cmake/modu
 
 find_package(HTSlib 1.4 REQUIRED)
 
-set(OBJ src/main.cpp src/io/bam_io.cpp src/io/bam_io.h src/core/types.h src/core/SnvCaller.cpp src/core/SnvCaller.h src/core/types.cpp)
+set(OBJ
+    src/main.cpp
+    src/io/bam_io.cpp
+    src/io/bam_io.h
+    src/core/types.h
+    src/core/SnvCaller.cpp
+    src/core/SnvCaller.h
+    src/core/types.cpp
+    src/io/loci.h
+    src/io/loci.cpp
+)
 
 add_executable(moss ${OBJ})
-target_include_directories (moss PUBLIC ${HTSlib_INCLUDE_DIRS})
-target_link_libraries (moss ${HTSlib_LIBRARIES})
+target_include_directories(moss PUBLIC ${HTSlib_INCLUDE_DIRS})
+target_link_libraries(moss ${HTSlib_LIBRARIES})
 
 set(TEST_DIR test)
-set(TEST_FILES ${TEST_DIR}/types_tests.cpp ${TEST_DIR}/catch.hpp ${TEST_DIR}/SnvCaller_tests.cpp src/core/SnvCaller.cpp src/core/types.cpp)
+set(TEST_FILES
+    ${TEST_DIR}/types_tests.cpp
+    ${TEST_DIR}/catch.hpp
+    ${TEST_DIR}/SnvCaller_tests.cpp
+    src/core/SnvCaller.cpp src/core/types.cpp
+)
 
 add_executable(test ${TEST_FILES})
 target_include_directories(test PUBLIC ${HTSlib_INCLUDE_DIRS})

@@ -3,6 +3,7 @@
 #include <vector>
 #include <sys/stat.h>
 #include "io/bam_io.h"
+#include "io/loci.h"
 #include "core/SnvCaller.h"
 #include "core/types.h"
 #include <array>
@@ -124,21 +125,24 @@ int main(int argc, char **argv) {
     }
     std::cout << "tau = " << tau << std::endl;
 
-    // TODO: merge loci files
     unsigned long num_tumor_samples = bam_files.size() - 1;
+    auto loci = moss::merge_loci(loci_files);
     moss::SnvCaller caller(num_tumor_samples);
     moss::BamStreamer streamer(ref_file, bam_files);
-    std::array<int, 10> pos = {583, 631, 726, 760, 961, 990, 1270, 1507, 1705, 1743};
-    for (auto &p : pos) {
-        moss::Pileups col = streamer.get_column("demo20", p);
-        auto array = col.get_read_columns();
-        moss::BaseSet normal;
-        uint8_t tumor;
-        unsigned long Z;
-        auto log_proba_non_soma = caller.calling(col, normal, tumor, Z);
-        std::string states(std::bitset<sizeof(Z)>(Z).to_string());
-        std::cout << "Pos: " << p << '\t' << "Prob: " << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << '\t'
-                  << states.substr(states.size()-4, 4) << std::endl;
+    for (const auto &chrom : loci) {
+        for (const auto &l : chrom.second) {
+            moss::Pileups col = streamer.get_column(chrom.first, l);
+            auto array = col.get_read_columns();
+            moss::BaseSet normal;
+            uint8_t tumor;
+            unsigned long Z;
+            auto log_proba_non_soma = caller.calling(col, normal, tumor, Z);
+            if (log_proba_non_soma < tau) {
+                std::string states(std::bitset<sizeof(Z)>(Z).to_string());
+                std::cout << "Pos: " << l << '\t' << "Prob: " << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << '\t'
+                          << states.substr(states.size()-4, 4) << std::endl;
+            }
+        }
     }
     exit(0);
 }

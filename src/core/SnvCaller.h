@@ -30,10 +30,11 @@ namespace moss {
      * Initialize max_elem to be -infinity, return accumulate.
      * @tparam T
      * @param max_elem
+     * @param accum
      * @return accumulate
      */
     template<typename T>
-    T &log_sum_exp_init(T &max_elem);
+    void log_sum_exp_init(T &max_elem, T &accum);
 
     /*!
      * Single iteration of log sum exp trick.

@@ -42,6 +42,7 @@ namespace moss {
     };
 
 
+    // TODO: need to be faster, manually set section, size of 1000?
     class BamStreamer {
     private:
         unsigned long num_samples;

@@ -144,12 +144,15 @@ double SnvCaller::calling(Pileups pile, BaseSet &normal_gt, uint8_t &tumor_gt, u
         max_deno_elem,
         max_tumor_evidence = -std::numeric_limits<double>::infinity(),
         max_evidence_elem;
-    double nume = log_sum_exp_init(max_nume_elem);
-    double deno = log_sum_exp_init(max_deno_elem);
+    double nume,
+        deno;
+    log_sum_exp_init(max_nume_elem, nume);
+    log_sum_exp_init(max_deno_elem, deno);
     int tumor_gt_idx;
     int idx_nuc = 0;
     for (const auto &tumor_base : tumor_bases.get_base_list()) {
-        double evidence = log_sum_exp_init(max_evidence_elem);
+        double evidence;
+        log_sum_exp_init(max_evidence_elem, evidence);
         for (int z = 0; z < (1 << n_tumor_sample); ++z) {
             double llh = 0;
             for (int idx_sample = 0; idx_sample < n_tumor_sample; ++idx_sample) {
@@ -227,10 +230,9 @@ T moss::log_sum_exp(std::vector<T> array) {
 }
 
 template<typename T>
-T &moss::log_sum_exp_init(T &max_elem) {
+void moss::log_sum_exp_init(T &max_elem, T &accum) {
     max_elem = -std::numeric_limits<T>::infinity();
-    T ret{};
-    return ret;
+    accum = T{};
 }
 
 template<typename T>
