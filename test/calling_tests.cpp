@@ -5,11 +5,11 @@
 #define CATCH_CONFIG_MAIN
 
 #include "catch.hpp"
-#include "../src/core/SnvCaller.h"
+#include "../src/core/calling.h"
 
 using namespace Catch;
 
-TEST_CASE("Binomial coefficient", "[SnvCaller]") {
+TEST_CASE("Binomial coefficient", "[calling]") {
     REQUIRE(moss::binom(0, 0) == 1);
     REQUIRE(moss::binom(1, 0) == 1);
     REQUIRE(moss::binom(1, 1) == 1);
@@ -31,7 +31,7 @@ TEST_CASE("Binomial coefficient", "[SnvCaller]") {
     REQUIRE_THAT(moss::binom(100, 50), WithinAbs(1.0089134454556415e+29, 1e14));
 }
 
-TEST_CASE("Trinomial coefficient", "[SnvCaller]") {
+TEST_CASE("Trinomial coefficient", "[calling]") {
     REQUIRE(moss::trinomial(3, 4, 3) == 4200);
     REQUIRE_THAT(moss::trinomial(33, 33, 34), WithinAbs(4.1924479242558294e+45, 1e32));
     REQUIRE(moss::trinomial(0, 0, 0) == 1);
@@ -44,11 +44,11 @@ TEST_CASE("Trinomial coefficient", "[SnvCaller]") {
     REQUIRE(moss::trinomial(0, 1, 1) == 2);
 }
 
-TEST_CASE("q-phred to probability", "[SnvCaller]") {
+TEST_CASE("q-phred to probability", "[calling]") {
     REQUIRE_THAT(moss::qphred2prob(30), WithinAbs(1e-3, 1e-21));
 }
 
-TEST_CASE("Log sum exp", "[SnvCaller]") {
+TEST_CASE("Log sum exp", "[calling]") {
     std::vector<double> v1{log(0.01), log(0.02), log(0.03), log(0.04)};
     REQUIRE_THAT(moss::log_sum_exp(v1), WithinAbs(log(0.1), 1e-21));
 

@@ -2,7 +2,7 @@
 // Created by Chuanyi Zhang on 2019-05-23.
 //
 
-#include "SnvCaller.h"
+#include "calling.h"
 #include <cmath>
 #include <map>
 
@@ -12,14 +12,39 @@ unsigned count_1bits[16] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
 
 // TODO: limiting number of tumor samples?
 // - Use custom arbitrary long binary indicator?
-SnvCaller::SnvCaller(int n_tumor_sample, double mu, double stepSize) : n_tumor_sample(n_tumor_sample), mu(mu),
-                                                                       stepSize(stepSize) {
+SnvCaller::SnvCaller(int n_tumor_sample, double mu, double stepSize, int max_depth) : n_tumor_sample(n_tumor_sample), mu(mu),
+                                                                       stepSize(stepSize), max_depth(max_depth) {
     gridSize = static_cast<int>(1 / stepSize + 1);
     logNoisePriorComplement = log(1 - mu);
     logPriorZComplement = logNoisePriorComplement - log((1 << n_tumor_sample) - 1);
     logMu = log1p(mu - 1);
     logUniform = -log(gridSize - 1);
     eps = 0.1;
+
+    p_err = new double *[n_tumor_sample];
+    is_normal = new bool *[n_tumor_sample];
+    is_tumor = new bool *[n_tumor_sample];
+    for (int idx_sample = 0; idx_sample < n_tumor_sample; ++idx_sample) {
+        p_err[idx_sample] = new double[max_depth];
+        is_normal[idx_sample] = new bool[max_depth];
+        is_tumor[idx_sample] = new bool[max_depth * 3];
+    }
+    n_tumor = new int[n_tumor_sample * 3]{};
+    n_normal = new int[n_tumor_sample]{};
+}
+
+
+SnvCaller::~SnvCaller() {
+    for (int idx_sample = 0; idx_sample < n_tumor_sample; ++idx_sample) {
+        delete[](p_err[idx_sample]);
+        delete[](is_normal[idx_sample]);
+        delete[](is_tumor[idx_sample]);
+    }
+    delete[](p_err);
+    delete[](is_normal);
+    delete[](is_tumor);
+    delete[](n_tumor);
+    delete[](n_normal);
 }
 
 BaseSet SnvCaller::normal_calling(std::vector<Read> column, uint8_t ref) {
@@ -43,16 +68,10 @@ Array3D
 SnvCaller::likelihood(std::vector<std::vector<Read>> aligned, BaseSet normal_bases, BaseSet tumor_base) {
     // pre-calculate
     auto n_gt = tumor_base.size();
-    auto p_err = new double *[n_tumor_sample];
-    auto is_normal = new bool *[n_tumor_sample];
-    auto is_tumor = new bool *[n_tumor_sample];
-    auto n_tumor = new int[n_tumor_sample * n_gt]{};
-    auto n_normal = new int[n_tumor_sample]{};
+    memset(n_normal, 0, n_tumor_sample * sizeof(int));
+    memset(n_tumor, 0, n_tumor_sample * 3 * sizeof(int));
     int idx_sample = 0;
     for (const auto &sample : aligned) {
-        p_err[idx_sample] = new double[sample.size()];
-        is_normal[idx_sample] = new bool[sample.size()];
-        is_tumor[idx_sample] = new bool[sample.size() * n_gt];
         int idx_read = 0;
         for (auto r = sample.begin(); r != sample.end(); ++r, ++idx_read) {
             p_err[idx_sample][idx_read] = qphred2prob(r->qual);
@@ -103,18 +122,6 @@ SnvCaller::likelihood(std::vector<std::vector<Read>> aligned, BaseSet normal_bas
         loglikelihood_3d.emplace_back(sample_llh_2d);
         ++idx_sample;
     }
-
-    // free
-    for (int idx_sample = 0; idx_sample < n_tumor_sample; ++idx_sample) {
-        delete[](p_err[idx_sample]);
-        delete[](is_normal[idx_sample]);
-        delete[](is_tumor[idx_sample]);
-    }
-    delete[](p_err);
-    delete[](is_normal);
-    delete[](is_tumor);
-    delete[](n_tumor);
-    delete[](n_normal);
     return loglikelihood_3d;
 }
 

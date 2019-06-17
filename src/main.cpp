@@ -4,19 +4,19 @@
 #include <sys/stat.h>
 #include "io/bam_io.h"
 #include "io/loci.h"
-#include "core/SnvCaller.h"
+#include "core/calling.h"
 #include "core/types.h"
 #include <array>
 
 
 const option long_options[] =
-        {
-                {"bam",     required_argument, nullptr,       'b'},
-                {"ref",     required_argument, nullptr,       'r'},
-                {"loci",    required_argument, nullptr,       'l'},
-                {"tau",     required_argument, nullptr,       't'},
-                {nullptr,   no_argument,       nullptr,       0}
-        };
+    {
+        {"bam",   required_argument, nullptr, 'b'},
+        {"ref",   required_argument, nullptr, 'r'},
+        {"loci",  required_argument, nullptr, 'l'},
+        {"tau",   required_argument, nullptr, 't'},
+        {nullptr, no_argument,       nullptr, 0}
+    };
 
 void print_help() {
     std::cout <<
@@ -128,12 +128,13 @@ int main(int argc, char **argv) {
     unsigned long num_tumor_samples = bam_files.size() - 1;
     auto loci = moss::merge_loci(loci_files);
     moss::SnvCaller caller(num_tumor_samples);
-    moss::BamStreamer streamer(ref_file, bam_files);
+    moss::BamStreamer streamer(ref_file, bam_files, loci);
     for (const auto &chrom : loci) {
         for (const auto &l : chrom.second) {
-            moss::Pileups col = streamer.get_column(chrom.first, l);
-            auto array = col.get_read_columns();
+            moss::Pileups col = streamer.get_column();
+            const auto& array = col.get_read_columns();
             moss::BaseSet normal;
+            // TODO: baseset
             uint8_t tumor;
             unsigned long Z;
             auto log_proba_non_soma = caller.calling(col, normal, tumor, Z);

@@ -7,8 +7,8 @@
 #include <vector>
 #include "loci.h"
 
-std::map<std::string, std::set<unsigned long>> moss::merge_loci(std::vector<std::string> filenames) {
-    std::map<std::string, std::set<unsigned long>> loci;
+moss::MapContigLoci moss::merge_loci(std::vector<std::string> filenames) {
+    MapContigLoci loci;
     for (const auto &filename : filenames) {
         std::string target,
                 position;

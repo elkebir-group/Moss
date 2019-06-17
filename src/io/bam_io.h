@@ -7,12 +7,16 @@
 
 #include <vector>
 #include <string>
+#include <deque>
+#include <iterator>
 #include "htslib/sam.h"
 #include "htslib/faidx.h"
 #include "../core/types.h"
 
 namespace moss {
     using plp_fp = int (*)(void *data, bam1_t *b);
+
+    using Buffer = std::deque<std::vector<Read>>;
 
     using mplp_conf_t = struct {
         int min_mq, flag, min_baseQ, capQ_thres, max_depth, max_indel_depth, fmt_flag, all;
@@ -29,7 +33,7 @@ namespace moss {
 
     using data_t = struct {
         samFile *sam_fp;
-        hts_itr_t *iter;
+        hts_itr_multi_t *iter;
         hts_idx_t *index;
         bam_hdr_t *header;
 //    mplp_ref_t *ref;
@@ -45,13 +49,19 @@ namespace moss {
     // TODO: need to be faster, manually set section, size of 1000?
     class BamStreamer {
     private:
-        unsigned long num_samples;
+        const unsigned long num_samples;
         std::vector<data_t **> meta;
         plp_fp pileup_func;
-        int min_base_qual;
-        std::string reference;
+        const int min_base_qual;
+        const std::string reference;
         faidx_t *ref_fp;
-
+        const MapContigLoci loci;                           //!< candidate positions
+        std::vector<std::vector<hts_reglist_t>> regions;    //!< regions of interest for sam_itr_regions
+        std::vector<std::pair<locus_t, locus_t>> windows;   //!< sliding windows for each sample
+        std::vector<int> tids;                              //!< current hts tid (current chrom) for each sample
+        std::vector<std::set<locus_t>::iterator> iters;     //!< iterator point to loci
+        std::vector<std::deque<locus_t>> actives;           //!< active loci for each sample
+        std::vector<Buffer> buffers;                        //!< buffer for Pileups in building
 
         static int mplp_func_plain(void *data, bam1_t *b);
 
@@ -62,12 +72,13 @@ namespace moss {
 
         explicit BamStreamer(std::string ref_file_name,
                              std::vector<std::string> bam_file_names,
+                             MapContigLoci loci,
                              Stepper stepper = Stepper::samtools,
                              int min_baseQ = 13);
 
         virtual ~BamStreamer();
 
-        Pileups get_column(std::string contig, int locus);
+        Pileups get_column();
 
         int print_pileup_seq(const bam_pileup1_t *p, int n);
     };
