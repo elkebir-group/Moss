@@ -141,7 +141,11 @@ int main(int argc, char **argv) {
             if (log_proba_non_soma < tau) {
                 std::string states(std::bitset<sizeof(Z)>(Z).to_string());
                 std::cout << "Pos: " << l << '\t' << "Prob: " << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << '\t'
-                          << states.substr(states.size()-4, 4) << std::endl;
+                          << states.substr(states.size()-4, 4) << '\t';
+                for (const auto &sample : array) {
+                    std::cout << sample.size() << ' ';
+                }
+                std::cout <<  std::endl;
             }
         }
     }

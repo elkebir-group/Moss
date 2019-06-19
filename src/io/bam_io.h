@@ -40,18 +40,11 @@ namespace moss {
         const mplp_conf_t *conf;
     };
 
-    enum class Stepper {
-        nofilter,
-        samtools
-    };
 
-
-    // TODO: need to be faster, manually set section, size of 1000?
     class BamStreamer {
     private:
         const unsigned long num_samples;
         std::vector<data_t **> meta;
-        plp_fp pileup_func;
         const int min_base_qual;
         const std::string reference;
         faidx_t *ref_fp;
@@ -63,17 +56,10 @@ namespace moss {
         std::vector<std::deque<locus_t>> actives;           //!< active loci for each sample
         std::vector<Buffer> buffers;                        //!< buffer for Pileups in building
 
-        static int mplp_func_plain(void *data, bam1_t *b);
-
-        static int mplp_func_samtools(void *data, bam1_t *b);
-
     public:
-        BamStreamer() = default;
-
         explicit BamStreamer(std::string ref_file_name,
-                             std::vector<std::string> bam_file_names,
-                             MapContigLoci loci,
-                             Stepper stepper = Stepper::samtools,
+                             const std::vector<std::string> &bam_file_names,
+                             const MapContigLoci& loci,
                              int min_baseQ = 13);
 
         virtual ~BamStreamer();

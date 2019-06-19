@@ -32,7 +32,7 @@ set(TEST_FILES
     ${TEST_DIR}/catch.hpp
     ${TEST_DIR}/calling_tests.cpp
     src/core/calling.cpp src/core/types.cpp
-)
+    test/bam_io_tests.cpp)
 
 add_executable(test ${TEST_FILES})
 target_include_directories(test PUBLIC ${HTSlib_INCLUDE_DIRS})

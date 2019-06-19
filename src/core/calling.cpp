@@ -10,7 +10,7 @@ using namespace moss;
 
 unsigned count_1bits[16] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
 
-// TODO: limiting number of tumor samples?
+// TODO: limited number of tumor samples?
 // - Use custom arbitrary long binary indicator?
 SnvCaller::SnvCaller(int n_tumor_sample, double mu, double stepSize, int max_depth) : n_tumor_sample(n_tumor_sample), mu(mu),
                                                                        stepSize(stepSize), max_depth(max_depth) {
@@ -47,7 +47,7 @@ SnvCaller::~SnvCaller() {
     delete[](n_normal);
 }
 
-BaseSet SnvCaller::normal_calling(std::vector<Read> column, uint8_t ref) {
+BaseSet SnvCaller::normal_calling(const std::vector<Read> &column, uint8_t ref) {
     std::map<uint8_t, int> count;
     for (const auto &r : column) {
         count[r.base]++;
@@ -65,7 +65,7 @@ BaseSet SnvCaller::normal_calling(std::vector<Read> column, uint8_t ref) {
 }
 
 Array3D
-SnvCaller::likelihood(std::vector<std::vector<Read>> aligned, BaseSet normal_bases, BaseSet tumor_base) {
+SnvCaller::likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet normal_bases, BaseSet tumor_base) {
     // pre-calculate
     auto n_gt = tumor_base.size();
     memset(n_normal, 0, n_tumor_sample * sizeof(int));
@@ -125,7 +125,7 @@ SnvCaller::likelihood(std::vector<std::vector<Read>> aligned, BaseSet normal_bas
     return loglikelihood_3d;
 }
 
-double SnvCaller::calling(Pileups pile, BaseSet &normal_gt, uint8_t &tumor_gt, unsigned long &Z) {
+double SnvCaller::calling(const Pileups &pile, BaseSet &normal_gt, uint8_t &tumor_gt, unsigned long &Z) {
     const std::vector<std::vector<Read>> &columns = pile.get_read_columns();
     uint8_t ref = pile.get_ref();
     normal_gt = normal_calling(columns[0], ref);

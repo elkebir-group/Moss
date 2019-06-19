@@ -70,7 +70,7 @@ namespace moss {
         int* n_tumor;
         int* n_normal;
 
-        BaseSet normal_calling(std::vector<Read> column, uint8_t ref);
+        BaseSet normal_calling(const std::vector<Read> &column, uint8_t ref);
 
         /*!
          * Calculate log likelihood of each samples given tumor base and VAF,
@@ -81,7 +81,7 @@ namespace moss {
          * @param tumor_base : return MLE tumor base
          * @return : 3D vector
          */
-        Array3D likelihood(std::vector<std::vector<Read>> aligned, BaseSet normal_bases, BaseSet tumor_base);
+        Array3D likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet normal_bases, BaseSet tumor_base);
 
     public:
 
@@ -89,7 +89,7 @@ namespace moss {
 
         virtual ~SnvCaller();
 
-        double calling(Pileups pile, BaseSet &normal_gt, uint8_t &tumor_gt, unsigned long &Z);
+        double calling(const Pileups &pile, BaseSet &normal_gt, uint8_t &tumor_gt, unsigned long &Z);
     };
 }
 
