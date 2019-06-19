@@ -5,6 +5,9 @@
 #include "calling.h"
 #include <cmath>
 #include <map>
+#include <cassert>
+#include <cstring>
+#include <limits>
 
 using namespace moss;
 

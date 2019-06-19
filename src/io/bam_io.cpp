@@ -6,6 +6,8 @@
 #include <iostream>
 #include <climits>
 #include <iomanip>
+#include <cstring>
+#include <cassert>
 
 using namespace moss;
 

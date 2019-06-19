@@ -2,6 +2,7 @@
 #include <getopt.h>
 #include <vector>
 #include <sys/stat.h>
+#include <bitset>
 #include "io/bam_io.h"
 #include "io/loci.h"
 #include "core/calling.h"

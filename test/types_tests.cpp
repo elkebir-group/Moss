@@ -44,7 +44,7 @@ TEST_CASE("IUPAC notation defined", "[types]") {
 }
 
 TEST_CASE("BaseSet", "[types]") {
-    using moss::operator""_8;
+    using moss::operator"" _8;
     auto set = moss::BaseSet(static_cast<uint8_t>(moss::IUPAC_nuc::M));
 
     REQUIRE(set.size() == 2);
