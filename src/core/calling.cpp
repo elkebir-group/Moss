@@ -15,8 +15,10 @@ unsigned count_1bits[16] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
 
 // TODO: limited number of tumor samples?
 // - Use custom arbitrary long binary indicator?
-SnvCaller::SnvCaller(int n_tumor_sample, double mu, double stepSize, int max_depth) : n_tumor_sample(n_tumor_sample), mu(mu),
-                                                                       stepSize(stepSize), max_depth(max_depth) {
+SnvCaller::SnvCaller(int n_tumor_sample, double mu, double stepSize, int max_depth) : n_tumor_sample(n_tumor_sample),
+                                                                                      mu(mu),
+                                                                                      stepSize(stepSize),
+                                                                                      max_depth(max_depth) {
     gridSize = static_cast<int>(1 / stepSize + 1);
     logNoisePriorComplement = log(1 - mu);
     logPriorZComplement = logNoisePriorComplement - log((1 << n_tumor_sample) - 1);

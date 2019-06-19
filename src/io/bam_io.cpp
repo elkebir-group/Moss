@@ -224,61 +224,69 @@ Pileups BamStreamer::get_column() {
      */
     for (int j = 0; j < num_samples; ++j) {
         int cnt = 0;
-        while ((ret = sam_itr_multi_next(meta[j][0]->sam_fp, meta[j][0]->iter, b)) >= 0) {
-            uint32_t *cigar = bam_get_cigar(b);
-//            for (int i = 0; i < b->core.n_cigar; ++i) {
-//                std::cout << (cigar[i] >> BAM_CIGAR_SHIFT) << BAM_CIGAR_STR[cigar[i] & BAM_CIGAR_MASK];
-//            }
-            locus_t begin = b->core.pos;
-            locus_t end = bam_endpos(b);
-//            std::cout << '\t' << b->core.pos << '\t' << b->core.l_qseq << '\t' << end << std::endl;
-            cnt++;
-            if (b->core.tid < 0 || (b->core.flag & BAM_FUNMAP)) {
-                continue;
-            }
-            // update window
-            windows[j].first = begin;
-            if (end > windows[j].second) {
-                windows[j].second = end;
-            }
-            // check iter
-            if (b->core.tid != tids[j]) {
-                tids[j] = b->core.tid;
-                if (iters.size() <= j) {
-                    iters.push_back(this->loci.at(std::string(meta[j][0]->header->target_name[b->core.tid])).cbegin());
-                } else {
-                    iters[j] = (this->loci.at(std::string(meta[j][0]->header->target_name[b->core.tid])).cbegin());
+        if (actives[j].size() == 0 || windows[j].first <= actives[j][0]) {
+            do {
+                ret = sam_itr_multi_next(meta[j][0]->sam_fp, meta[j][0]->iter, b);
+                if (ret < 0) {
+                    break;
                 }
-            }
-            // find new active loci
-            while (*iters[j] <= windows[j].second) {
-                actives[j].emplace_back(*iters[j]);
-                buffers[j].emplace_back(std::vector<Read>());
-                iters[j]++;
-            }
-            // push into queue
-            cstate_t c{};
-            c.k = -1;
-            int idx_pos = 0;
-            for (const auto &pos : actives[j]) {
-//                int qpos = pos - windows[j].first;          // use cigar!
-                if (pos >= windows[j].first && pos < end) {
-                    PileupMeta p{};
-                    resolve_cigar2(b, pos, &c, &p);
-                    if (!p.is_del && p.qpos >= 0 && p.qpos < b->core.l_qseq) {
-                        uint8_t base_qual = bam_get_qual(b)[p.qpos];
-                        if (base_qual >= min_base_qual) {
-                            buffers[j][idx_pos].push_back(Read{static_cast<uint8_t >(bam_seqi(bam_get_seq(b), p.qpos)),
-                                                               base_qual});
-                        }
+                uint32_t *cigar = bam_get_cigar(b);
+//                for (int i = 0; i < b->core.n_cigar; ++i) {
+//                    std::cout << (cigar[i] >> BAM_CIGAR_SHIFT) << BAM_CIGAR_STR[cigar[i] & BAM_CIGAR_MASK];
+//                }
+                locus_t begin = b->core.pos;
+                locus_t end = bam_endpos(b);
+//                std::cout << '\t' << b->core.pos << '\t' << b->core.l_qseq << '\t' << end << std::endl;
+                cnt++;
+                if (b->core.tid < 0 || (b->core.flag & BAM_FUNMAP)) {
+                    continue;
+                }
+                // update window
+                windows[j].first = begin;
+                if (end > windows[j].second) {
+                    windows[j].second = end;
+                }
+                // check iter
+                if (b->core.tid != tids[j]) {
+                    tids[j] = b->core.tid;
+                    if (iters.size() <= j) {
+                        iters.push_back(
+                            this->loci.at(std::string(meta[j][0]->header->target_name[b->core.tid])).cbegin());
+                    } else {
+                        iters[j] = (this->loci.at(std::string(meta[j][0]->header->target_name[b->core.tid])).cbegin());
                     }
                 }
-                idx_pos++;
-            }
-            // Until first in the queue finished
-            if (windows[j].first > actives[j][0]) {
-                break;
-            }
+                // find new active loci
+                while (*iters[j] <= windows[j].second) {
+                    if (iters[j] != this->loci.at(std::string(meta[j][0]->header->target_name[b->core.tid])).cend()) {
+                        actives[j].emplace_back(*iters[j]);
+                        buffers[j].emplace_back(std::vector<Read>());
+                        ++iters[j];
+                    } else {
+                        break;
+                    }
+                }
+                // push into queue
+                cstate_t c{};
+                c.k = -1;
+                int idx_pos = 0;
+                for (const auto &pos : actives[j]) {
+//                int qpos = pos - windows[j].first;          // use cigar!
+                    if (pos >= windows[j].first && pos < end) {
+                        PileupMeta p{};
+                        resolve_cigar2(b, pos, &c, &p);
+                        if (!p.is_del && p.qpos >= 0 && p.qpos < b->core.l_qseq) {
+                            uint8_t base_qual = bam_get_qual(b)[p.qpos];
+                            if (base_qual >= min_base_qual) {
+                                buffers[j][idx_pos].push_back(
+                                    Read{static_cast<uint8_t >(bam_seqi(bam_get_seq(b), p.qpos)),
+                                         base_qual});
+                            }
+                        }
+                    }
+                    idx_pos++;
+                }
+            } while (windows[j].first <= actives[j][0]);
         }
         // find reference, only once
         if (j == 0) {

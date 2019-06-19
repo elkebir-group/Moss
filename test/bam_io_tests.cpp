@@ -17,11 +17,11 @@ TEST_CASE("CIGAR resolving", "[bam]") {
 
     uint8_t data[37]{};
     uint32_t cigar[3]{
-        (6<<BAM_CIGAR_SHIFT)  | BAM_CMATCH,
-        (14<<BAM_CIGAR_SHIFT) | BAM_CREF_SKIP,
-        (5<<BAM_CIGAR_SHIFT)  | BAM_CMATCH
+        (6 << BAM_CIGAR_SHIFT) | BAM_CMATCH,
+        (14 << BAM_CIGAR_SHIFT) | BAM_CREF_SKIP,
+        (5 << BAM_CIGAR_SHIFT) | BAM_CMATCH
     };
-    uint8_t seq[6]{(1<<4) | 8, (1<<4) | 4, (2<<4) | 8, (8<<4) | 2, (1<<4) | 4, (2<<4)}; // ATAGCTTCAGC
+    uint8_t seq[6]{(1 << 4) | 8, (1 << 4) | 4, (2 << 4) | 8, (8 << 4) | 2, (1 << 4) | 4, (2 << 4)}; // ATAGCTTCAGC
 
     bam1_t b{
         core,       // core

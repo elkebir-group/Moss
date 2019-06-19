@@ -59,7 +59,7 @@ namespace moss {
     public:
         explicit BamStreamer(std::string ref_file_name,
                              const std::vector<std::string> &bam_file_names,
-                             const MapContigLoci& loci,
+                             const MapContigLoci &loci,
                              int min_baseQ = 13);
 
         virtual ~BamStreamer();
