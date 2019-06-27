@@ -37,6 +37,8 @@ TEST_CASE("CIGAR resolving", "[bam]") {
 
     cstate_t c{-1, 0, 0, 0};
     PileupMeta p{};
+    resolve_cigar2(&b, 39, &c, &p);
+    REQUIRE(p.qpos == 10);
     resolve_cigar2(&b, 20, &c, &p);
     REQUIRE(p.qpos == 5);
     resolve_cigar2(&b, 24, &c, &p);

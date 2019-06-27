@@ -291,7 +291,7 @@ Pileups BamStreamer::get_column() {
         // find reference, only once
         if (j == 0) {
             int len_seq;
-            char *temp = faidx_fetch_seq(ref_fp, meta[j][0]->header->target_name[b->core.tid], actives[j].front(),
+            char *temp = faidx_fetch_seq(ref_fp, meta[j][0]->header->target_name[tids[j]], actives[j].front(),
                                          actives[j].front(), &len_seq);
             read_col.set_ref(temp[0]);
             free(temp);

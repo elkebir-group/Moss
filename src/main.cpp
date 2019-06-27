@@ -128,6 +128,7 @@ int main(int argc, char **argv) {
 
     unsigned long num_tumor_samples = bam_files.size() - 1;
     auto loci = moss::merge_loci(loci_files);
+    std::cout << "## Loci merged" << std::endl;
     moss::SnvCaller caller(num_tumor_samples);
     moss::BamStreamer streamer(ref_file, bam_files, loci);
     for (const auto &chrom : loci) {
@@ -142,7 +143,7 @@ int main(int argc, char **argv) {
             if (log_proba_non_soma < tau) {
                 std::string states(std::bitset<sizeof(Z)>(Z).to_string());
                 std::cout << "Pos: " << l+1 << '\t' << "Prob: " << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << '\t'
-                          << states.substr(states.size()-4, 4) << '\t';
+                          << states.substr(states.size() - num_tumor_samples, num_tumor_samples) << '\t';
                 for (const auto &sample : array) {
                     std::cout << sample.size() << ' ';
                 }
