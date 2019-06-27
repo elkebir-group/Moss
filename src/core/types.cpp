@@ -13,7 +13,8 @@ void moss::Pileups::set_ref(char ref) {
     Pileups::ref = seq_nt16_table[ref];
 }
 
-void moss::Pileups::emplace_read_column(std::vector<moss::Read> &col) {
+// TODO: rvalue ref here?
+void moss::Pileups::emplace_read_column(std::vector<moss::Read> &&col) {
     read_columns.emplace_back(col);
 }
 

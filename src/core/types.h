@@ -6,10 +6,17 @@
 #define MOSS_TYPES_H
 
 #include <vector>
+#include <set>
+#include <map>
 
 // internal bases are stored in 4-bit values.
 
 namespace moss {
+    using locus_t = unsigned long;
+
+    // TODO: is std::set really needed here?
+    using MapContigLoci = std::map<std::string, std::set<locus_t>>;
+
     enum class IUPAC_nuc : std::uint8_t {
         EQ, A, C, M, G, R, S, V, T, W, Y, H, K, D, B, N
     };
@@ -72,7 +79,7 @@ namespace moss {
 
         void set_ref(char ref);
 
-        void emplace_read_column(std::vector<Read> &col);
+        void emplace_read_column(std::vector<Read> &&col);
 
         const std::vector<std::vector<Read>> &get_read_columns() const;
 

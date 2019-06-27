@@ -2,21 +2,22 @@
 #include <getopt.h>
 #include <vector>
 #include <sys/stat.h>
+#include <bitset>
 #include "io/bam_io.h"
 #include "io/loci.h"
-#include "core/SnvCaller.h"
+#include "core/calling.h"
 #include "core/types.h"
 #include <array>
 
 
 const option long_options[] =
-        {
-                {"bam",     required_argument, nullptr,       'b'},
-                {"ref",     required_argument, nullptr,       'r'},
-                {"loci",    required_argument, nullptr,       'l'},
-                {"tau",     required_argument, nullptr,       't'},
-                {nullptr,   no_argument,       nullptr,       0}
-        };
+    {
+        {"bam",   required_argument, nullptr, 'b'},
+        {"ref",   required_argument, nullptr, 'r'},
+        {"loci",  required_argument, nullptr, 'l'},
+        {"tau",   required_argument, nullptr, 't'},
+        {nullptr, no_argument,       nullptr, 0}
+    };
 
 void print_help() {
     std::cout <<
@@ -127,20 +128,26 @@ int main(int argc, char **argv) {
 
     unsigned long num_tumor_samples = bam_files.size() - 1;
     auto loci = moss::merge_loci(loci_files);
+    std::cout << "## Loci merged" << std::endl;
     moss::SnvCaller caller(num_tumor_samples);
-    moss::BamStreamer streamer(ref_file, bam_files);
+    moss::BamStreamer streamer(ref_file, bam_files, loci);
     for (const auto &chrom : loci) {
         for (const auto &l : chrom.second) {
-            moss::Pileups col = streamer.get_column(chrom.first, l);
-            auto array = col.get_read_columns();
+            moss::Pileups col = streamer.get_column();
+            const auto& array = col.get_read_columns();
             moss::BaseSet normal;
+            // TODO: baseset
             uint8_t tumor;
             unsigned long Z;
             auto log_proba_non_soma = caller.calling(col, normal, tumor, Z);
             if (log_proba_non_soma < tau) {
                 std::string states(std::bitset<sizeof(Z)>(Z).to_string());
-                std::cout << "Pos: " << l << '\t' << "Prob: " << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << '\t'
-                          << states.substr(states.size()-4, 4) << std::endl;
+                std::cout << "Pos: " << l+1 << '\t' << "Prob: " << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << '\t'
+                          << states.substr(states.size() - num_tumor_samples, num_tumor_samples) << '\t';
+                for (const auto &sample : array) {
+                    std::cout << sample.size() << ' ';
+                }
+                std::cout <<  std::endl;
             }
         }
     }

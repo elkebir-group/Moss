@@ -2,8 +2,8 @@
 // Created by Chuanyi Zhang on 2019-05-23.
 //
 
-#ifndef MOSS_SNVCALLER_H
-#define MOSS_SNVCALLER_H
+#ifndef MOSS_CALLING_H
+#define MOSS_CALLING_H
 
 #include <vector>
 #include "types.h"
@@ -52,7 +52,8 @@ namespace moss {
     class SnvCaller {
     private:
         int n_tumor_sample,
-                gridSize;
+            gridSize,
+            max_depth;
         // neucleotide = {'T', 'A', 'G', 'C'};
         // genotype = {"ref": 0, "het": 0.5, "hom": 1};
         double stepSize,
@@ -63,14 +64,13 @@ namespace moss {
                 logNoisePriorComplement,
                 eps;
 
-        BaseSet normal_calling(std::vector<Read> column, uint8_t ref);
+        double** p_err;
+        bool** is_normal;
+        bool** is_tumor;
+        int* n_tumor;
+        int* n_normal;
 
-//        Array3D likelihood(std::vector<std::vector<Read>> aligned, std::unordered_set<uint8_t> normal_bases,
-//                           std::unordered_set<uint8_t> tumor_base);
-
-    public:
-
-        SnvCaller(int n_tumor_sample, double mu = 1.0 - 5e-6, double stepSize = 0.05);
+        BaseSet normal_calling(const std::vector<Read> &column, uint8_t ref);
 
         /*!
          * Calculate log likelihood of each samples given tumor base and VAF,
@@ -81,11 +81,17 @@ namespace moss {
          * @param tumor_base : return MLE tumor base
          * @return : 3D vector
          */
-        Array3D likelihood(std::vector<std::vector<Read>> aligned, BaseSet normal_bases, BaseSet tumor_base);
+        Array3D likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet normal_bases, BaseSet tumor_base);
 
-        double calling(Pileups pile, BaseSet &normal_gt, uint8_t &tumor_gt, unsigned long &Z);
+    public:
+
+        SnvCaller(int n_tumor_sample, double mu = 1.0 - 5e-6, double stepSize = 0.05, int max_depth = 500);
+
+        virtual ~SnvCaller();
+
+        double calling(const Pileups &pile, BaseSet &normal_gt, uint8_t &tumor_gt, unsigned long &Z);
     };
 }
 
 
-#endif //MOSS_SNVCALLER_H
+#endif //MOSS_CALLING_H

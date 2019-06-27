@@ -15,8 +15,8 @@ set(OBJ
     src/io/bam_io.cpp
     src/io/bam_io.h
     src/core/types.h
-    src/core/SnvCaller.cpp
-    src/core/SnvCaller.h
+    src/core/calling.cpp
+    src/core/calling.h
     src/core/types.cpp
     src/io/loci.h
     src/io/loci.cpp
@@ -30,9 +30,9 @@ set(TEST_DIR test)
 set(TEST_FILES
     ${TEST_DIR}/types_tests.cpp
     ${TEST_DIR}/catch.hpp
-    ${TEST_DIR}/SnvCaller_tests.cpp
-    src/core/SnvCaller.cpp src/core/types.cpp
-)
+    ${TEST_DIR}/calling_tests.cpp
+    src/core/calling.cpp src/core/types.cpp
+    test/bam_io_tests.cpp)
 
 add_executable(test ${TEST_FILES})
 target_include_directories(test PUBLIC ${HTSlib_INCLUDE_DIRS})
