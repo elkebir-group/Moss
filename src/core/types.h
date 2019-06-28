@@ -46,6 +46,8 @@ namespace moss {
         static BaseSet set_difference(uint8_t a, uint8_t b);
 
         BaseSet complement();
+
+        void add_base(uint8_t base);
     };
 
     inline unsigned moss::BaseSet::size() {

@@ -6,6 +6,7 @@
 #include <sstream>
 #include <vector>
 #include "loci.h"
+#include "../io/vcf_io.h"
 
 moss::MapContigLoci moss::merge_loci(std::vector<std::string> filenames) {
     MapContigLoci loci;
@@ -26,6 +27,24 @@ moss::MapContigLoci moss::merge_loci(std::vector<std::string> filenames) {
             }
         }
         file.close();
+    }
+    return loci;
+}
+
+moss::MapContigLoci moss::merge_vcf(std::vector<std::string> filenames) {
+    MapContigLoci loci;
+    for (const auto &filename : filenames) {
+        Vcf vcf(filename);
+        auto pos = vcf.get_pos();
+        auto chrom = vcf.get_chrom();
+        for (int i = 0; i < pos.size(); ++i) {
+            auto item = loci.find(chrom[i]);
+            if (item != loci.end()) {
+                item->second.insert(pos[i]);
+            } else {
+                loci.insert(std::make_pair(chrom[i], std::set<unsigned long>({pos[i]})));
+            }
+        }
     }
     return loci;
 }

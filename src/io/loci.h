@@ -11,6 +11,7 @@
 
 namespace moss {
     MapContigLoci merge_loci(std::vector<std::string> filenames);
+    MapContigLoci merge_vcf(std::vector<std::string> filenames);
 }
 
 #endif //MOSS_LOCI_H

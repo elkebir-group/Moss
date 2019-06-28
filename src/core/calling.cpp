@@ -15,10 +15,8 @@ unsigned count_1bits[16] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
 
 // TODO: limited number of tumor samples?
 // - Use custom arbitrary long binary indicator?
-SnvCaller::SnvCaller(int n_tumor_sample, double mu, double stepSize, int max_depth) : n_tumor_sample(n_tumor_sample),
-                                                                                      mu(mu),
-                                                                                      stepSize(stepSize),
-                                                                                      max_depth(max_depth) {
+SnvCaller::SnvCaller(int n_tumor_sample, std::string normal, double mu, double stepSize, int max_depth)
+    : n_tumor_sample(n_tumor_sample), normal_result(Vcf(normal)), mu(mu), stepSize(stepSize), max_depth(max_depth) {
     gridSize = static_cast<int>(1 / stepSize + 1);
     logNoisePriorComplement = log(1 - mu);
     logPriorZComplement = logNoisePriorComplement - log((1 << n_tumor_sample) - 1);
@@ -64,6 +62,19 @@ BaseSet SnvCaller::normal_calling(const std::vector<Read> &column, uint8_t ref) 
             } else if (1 - eps <= c.second / static_cast<double>(column.size())) {
                 return BaseSet(c.first);
             }
+        }
+    }
+    return BaseSet(ref);
+}
+
+// TODO: use GT in VCF file
+BaseSet SnvCaller::normal_calling(locus_t pos, uint8_t ref) {
+    auto normal_pos = normal_result.get_pos();
+    auto normal_pass = normal_result.get_filter();
+    auto normal_gt = normal_result.get_gt();
+    for (int i = 0; i < normal_pos.size(); ++i) {
+        if (normal_pos[i] == pos && normal_pass[i] == "PASS") {
+            return normal_gt[i];
         }
     }
     return BaseSet(ref);
@@ -130,10 +141,10 @@ SnvCaller::likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet nor
     return loglikelihood_3d;
 }
 
-double SnvCaller::calling(const Pileups &pile, BaseSet &normal_gt, uint8_t &tumor_gt, unsigned long &Z) {
+double SnvCaller::calling(locus_t pos, const Pileups &pile, BaseSet &normal_gt, uint8_t &tumor_gt, unsigned long &Z) {
     const std::vector<std::vector<Read>> &columns = pile.get_read_columns();
     uint8_t ref = pile.get_ref();
-    normal_gt = normal_calling(columns[0], ref);
+    normal_gt = normal_calling(pos, ref);
     BaseSet tumor_bases = BaseSet::set_difference(0x0f_8, ref);
     Array3D lhood = likelihood(std::vector<std::vector<moss::Read>>(columns.begin() + 1, columns.end()), normal_gt,
                                tumor_bases);

@@ -14,7 +14,9 @@ const option long_options[] =
     {
         {"bam",   required_argument, nullptr, 'b'},
         {"ref",   required_argument, nullptr, 'r'},
+        {"normal",required_argument, nullptr, 'n'},
         {"loci",  required_argument, nullptr, 'l'},
+        {"vcf",   required_argument, nullptr, 'v'},
         {"tau",   required_argument, nullptr, 't'},
         {nullptr, no_argument,       nullptr, 0}
     };
@@ -27,7 +29,9 @@ void print_help() {
         "                       one sample, can be addressed multiple times to\n"
         "                       specify\n"
         "-r, --ref <FASTA>      reference FASTA file\n"
+        "-n, --normal <NORMAL>  normal sample's germline VCF result\n"
         "-l, --loci <LOCI>      candidate loci files\n"
+        "-v, --vcf <VCF>        tumor samples' somatic VCF result\n"
         "-t, --tau <TAU>        optional threshold for somatic score, default is -3"
         "--verbose              set verbose flag\n"
         "--brief                set brief flag, mutual exclusive to --verbose\n";
@@ -42,14 +46,16 @@ bool is_file_exist(const std::string& name) {
 
 int main(int argc, char **argv) {
     int c;
-    const char* const short_opts = "b:r:l:t:h";
+    const char* const short_opts = "b:r:n:l:v:t:h";
 
 
     // variables
     std::string ref_file;
+    std::string normal_vcf;
     std::vector<std::string> bam_files;
     std::vector<std::string> bam_idx;
     std::vector<std::string> loci_files;
+    std::vector<std::string> tumor_vcfs;
     double tau(-3.0);
 
     /* getopt_long stores the option index here. */
@@ -78,8 +84,16 @@ int main(int argc, char **argv) {
                 ref_file = std::string(optarg);
                 break;
 
+            case 'n':
+                normal_vcf = std::string(optarg);
+                break;
+
             case 'l':
                 loci_files.emplace_back(std::string(optarg));
+                break;
+
+            case 'v':
+                tumor_vcfs.emplace_back(std::string(optarg));
                 break;
 
             case 't':
@@ -127,9 +141,10 @@ int main(int argc, char **argv) {
     std::cout << "tau = " << tau << std::endl;
 
     unsigned long num_tumor_samples = bam_files.size() - 1;
-    auto loci = moss::merge_loci(loci_files);
+//    auto loci = moss::merge_loci(loci_files);
+    auto loci = moss::merge_vcf(tumor_vcfs);
     std::cout << "## Loci merged" << std::endl;
-    moss::SnvCaller caller(num_tumor_samples);
+    moss::SnvCaller caller(num_tumor_samples, normal_vcf);
     moss::BamStreamer streamer(ref_file, bam_files, loci);
     for (const auto &chrom : loci) {
         for (const auto &l : chrom.second) {
@@ -139,7 +154,7 @@ int main(int argc, char **argv) {
             // TODO: baseset
             uint8_t tumor;
             unsigned long Z;
-            auto log_proba_non_soma = caller.calling(col, normal, tumor, Z);
+            auto log_proba_non_soma = caller.calling(l, col, normal, tumor, Z);
             if (log_proba_non_soma < tau) {
                 std::string states(std::bitset<sizeof(Z)>(Z).to_string());
                 std::cout << "Pos: " << l+1 << '\t' << "Prob: " << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << '\t'

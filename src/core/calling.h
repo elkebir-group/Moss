@@ -7,6 +7,7 @@
 
 #include <vector>
 #include "types.h"
+#include "../io/vcf_io.h"
 
 namespace moss {
     using Array3D = std::vector<std::vector<std::vector<double> > >;
@@ -51,6 +52,7 @@ namespace moss {
 
     class SnvCaller {
     private:
+        Vcf normal_result;
         int n_tumor_sample,
             gridSize,
             max_depth;
@@ -72,6 +74,8 @@ namespace moss {
 
         BaseSet normal_calling(const std::vector<Read> &column, uint8_t ref);
 
+        BaseSet normal_calling(locus_t pos, uint8_t ref);
+
         /*!
          * Calculate log likelihood of each samples given tumor base and VAF,
          * P( D_j | f_j, z_j, g_t, g_n).
@@ -85,11 +89,11 @@ namespace moss {
 
     public:
 
-        SnvCaller(int n_tumor_sample, double mu = 1.0 - 5e-6, double stepSize = 0.05, int max_depth = 500);
+        SnvCaller(int n_tumor_sample, std::string normal, double mu = 1.0 - 5e-6, double stepSize = 0.05, int max_depth = 500);
 
         virtual ~SnvCaller();
 
-        double calling(const Pileups &pile, BaseSet &normal_gt, uint8_t &tumor_gt, unsigned long &Z);
+        double calling(locus_t pos, const Pileups &pile, BaseSet &normal_gt, uint8_t &tumor_gt, unsigned long &Z);
     };
 }
 
