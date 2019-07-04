@@ -69,11 +69,13 @@ BaseSet SnvCaller::normal_calling(const std::vector<Read> &column, uint8_t ref) 
 
 // TODO: use GT in VCF file
 BaseSet SnvCaller::normal_calling(locus_t pos, uint8_t ref) {
-    auto normal_pos = normal_result.get_pos();
-    auto normal_pass = normal_result.get_filter();
-    auto normal_gt = normal_result.get_gt();
-    for (int i = 0; i < normal_pos.size(); ++i) {
-        if (normal_pos[i] == pos && normal_pass[i] == "PASS") {
+    const auto &normal_pos = normal_result.get_pos();
+    const auto &normal_pass = normal_result.get_filter();
+    const auto &normal_gt = normal_result.get_gt();
+    auto search = normal_pos.find(pos);
+    if (search != normal_pos.end()) {
+        uint32_t i = search->second;
+        if (normal_pass[i] == "PASS") {
             return normal_gt[i];
         }
     }
@@ -145,7 +147,8 @@ double SnvCaller::calling(locus_t pos, const Pileups &pile, BaseSet &normal_gt, 
     const std::vector<std::vector<Read>> &columns = pile.get_read_columns();
     uint8_t ref = pile.get_ref();
     normal_gt = normal_calling(pos, ref);
-    BaseSet tumor_bases = BaseSet::set_difference(0x0f_8, ref);
+    // BaseSet tumor_bases = BaseSet::set_difference(0x0f_8, ref);
+    BaseSet tumor_bases = normal_gt.complement();
     Array3D lhood = likelihood(std::vector<std::vector<moss::Read>>(columns.begin() + 1, columns.end()), normal_gt,
                                tumor_bases);
 

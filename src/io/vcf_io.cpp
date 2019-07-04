@@ -34,13 +34,14 @@ Vcf::Vcf(const std::string &filename) : filename(filename) {
     std::ifstream ifile{filename};
     if (ifile) {
         bool has_GT = false;
+        uint32_t cnt = 0;
         while (!ifile.eof()) {
             std::string line;
             std::getline(ifile, line);
             if (line.size() > 0) {
                 if (line.at(0) == '#') {
-                    if (line.compare(2, 6, "FORMAT")){
-                        if (line.compare(13, 2, "GT")) {
+                    if (line.compare(2, 6, "FORMAT") == 0){
+                        if (line.compare(13, 2, "GT") == 0) {
                             has_GT = true;
                         }
                     }
@@ -56,7 +57,8 @@ Vcf::Vcf(const std::string &filename) : filename(filename) {
                     std::getline(ss, chrom_s, '\t');
                     chrom.emplace_back(chrom_s);
                     std::getline(ss, temp, '\t');
-                    pos.emplace_back(std::stoi(temp) - 1);
+                    pos[std::stoi(temp) - 1] = cnt;
+                    cnt++;
                     std::getline(ss, id_s, '\t');
                     id.emplace_back(id_s);
                     std::getline(ss, ref_s, '\t');
@@ -94,7 +96,7 @@ Vcf::Vcf(const std::string &filename) : filename(filename) {
                             std::stringstream sample{temp};
                             std::string field;
                             while (std::getline(sample, field, ':')) {
-                                if (field.compare(0, 2, std::string{"GT"})) {
+                                if (field.compare(0, 2, std::string{"GT"}) == 0) {
                                     break;
                                 }
                                 idx_gt++;
@@ -111,6 +113,9 @@ Vcf::Vcf(const std::string &filename) : filename(filename) {
                                         if ((field[0] == '0' && field[2] == '1') ||
                                             (field[0] == '1' && field[2] == '0')) {
                                             gt.emplace_back(BaseSet(ref.back() | alt.back()[0]));
+                                        } else if ((field[0] == '0' && field[2] == '2') ||
+                                                   (field[0] == '2' && field[2] == '0')) {
+                                            gt.emplace_back(BaseSet(ref.back() | alt.back()[2]));
                                         } else if ((field[0] == '1' && field[2] == '2') ||
                                                    (field[0] == '2' && field[2] == '1')) {
                                             gt.emplace_back(BaseSet(alt.back()[0] | alt.back()[1]));
@@ -118,7 +123,9 @@ Vcf::Vcf(const std::string &filename) : filename(filename) {
                                             gt.emplace_back(BaseSet(alt.back()[0]));
                                         }
                                     }
+                                    break;
                                 }
+                                idx++;
                             }
                         }
                     }
@@ -129,7 +136,7 @@ Vcf::Vcf(const std::string &filename) : filename(filename) {
     }
 }
 
-const std::vector<locus_t> &Vcf::get_pos() const {
+const std::map<locus_t, uint32_t> &Vcf::get_pos() const {
     return pos;
 }
 

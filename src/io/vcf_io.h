@@ -7,6 +7,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include "../core/types.h"
 
 namespace moss {
@@ -16,7 +17,7 @@ namespace moss {
     private:
         std::string filename;
         std::vector<std::string> chrom;
-        std::vector<locus_t> pos;
+        std::map<locus_t, uint32_t> pos;
         std::vector<std::string> id;
         std::vector<uint8_t> ref;
         std::vector<std::vector<uint8_t>> alt;
@@ -27,7 +28,7 @@ namespace moss {
     public:
         explicit Vcf(const std::string &filename);
 
-        const std::vector<locus_t> &get_pos() const;
+        const std::map<locus_t, uint32_t> &get_pos() const;
 
         const std::vector<std::string> &get_filter() const;
 
