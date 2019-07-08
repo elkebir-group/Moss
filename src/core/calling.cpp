@@ -96,7 +96,7 @@ SnvCaller::likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet nor
             is_normal[idx_sample][idx_read] = normal_bases.contain(r->base);
             n_normal[idx_sample] += is_normal[idx_sample][idx_read] ? 1 : 0;
             int idx_base = 0;
-            for (const auto &tumorBase : tumor_base.get_base_list()) {
+            for (const auto &tumorBase : tumor_base) {
                 bool eq = r->base == tumorBase;
                 is_tumor[idx_sample][idx_read * n_gt + idx_base] = eq;
                 n_tumor[idx_sample * n_gt + idx_base] += eq ? 1 : 0;
@@ -113,7 +113,7 @@ SnvCaller::likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet nor
         std::vector<std::vector<double>> sample_llh_2d;
         sample_llh_2d.reserve(tumor_base.size());
         int idx_base = 0;
-        for (const auto &base : tumor_base.get_base_list()) {
+        for (const auto &base : tumor_base) {
             std::vector<double> base_llh_1d;
             base_llh_1d.reserve(gridSize);
             for (int i = 0; i < gridSize; ++i) {
@@ -176,7 +176,7 @@ double SnvCaller::calling(locus_t pos, const Pileups &pile, BaseSet &normal_gt, 
     log_sum_exp_init(max_deno_elem, deno);
     int tumor_gt_idx;
     int idx_nuc = 0;
-    for (const auto &tumor_base : tumor_bases.get_base_list()) {
+    for (const auto &tumor_base : tumor_bases) {
         double evidence;
         log_sum_exp_init(max_evidence_elem, evidence);
         for (int z = 0; z < (1 << n_tumor_sample); ++z) {

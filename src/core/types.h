@@ -28,7 +28,6 @@ namespace moss {
     class BaseSet {
     private:
         uint8_t set;
-        std::vector<uint8_t> base_list;
         static const unsigned count_1bits[16];
     public:
         BaseSet() = default;
@@ -41,13 +40,39 @@ namespace moss {
 
         uint8_t get_set();
 
-        const std::vector<uint8_t> &get_base_list();
-
         static BaseSet set_difference(uint8_t a, uint8_t b);
 
         BaseSet complement();
 
         void add_base(uint8_t base);
+
+        class iter {
+        public:
+            iter(uint8_t pos, uint8_t set) : pos(pos), set(set) {}
+
+            iter operator++() {
+                do {
+                    pos <<= 1;
+                } while (((pos & set) == 0) && (pos < (1 << 4)));
+                return *this;
+            }
+
+            bool operator!=(const iter &other) const { return pos != other.pos; }
+
+            const uint8_t operator*() const { return pos; }
+
+        private:
+            uint8_t pos;
+            uint8_t set;
+        };
+
+        iter begin() const {
+            uint8_t mask = 1;
+            while ((mask & set) == 0) { mask <<= 1; }
+            return {mask, set};
+        }
+
+        iter end() const { return {16, set}; }
     };
 
     inline unsigned moss::BaseSet::size() {

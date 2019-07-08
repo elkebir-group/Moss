@@ -70,9 +70,16 @@ TEST_CASE("BaseSet", "[types]") {
 
     auto difference = moss::BaseSet::set_difference(0x0c_8, 0x0a_8);
     REQUIRE(difference.get_set() == 0x04_8);
-    REQUIRE_THAT(difference.get_base_list(), Equals(std::vector<uint8_t>({0x04_8})));
+    for (const auto &item : difference) {
+        REQUIRE(item == 0x04_8);
+    }
 
     auto comple = moss::BaseSet(0x06_8).complement();
     REQUIRE(comple.get_set() == 0x09_8);
-    REQUIRE_THAT(comple.get_base_list(), Equals(std::vector<uint8_t>({0x01_8, 0x08_8})));
+    uint8_t truth[] {0x01_8, 0x08_8};
+    int idx = 0;
+    for (const auto &item : comple) {
+        REQUIRE(item == truth[idx]);
+        idx++;
+    }
 }
