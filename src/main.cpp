@@ -9,6 +9,7 @@
 #include "core/types.h"
 #include <array>
 
+static int dry_flag = 0;
 
 const option long_options[] =
     {
@@ -18,6 +19,7 @@ const option long_options[] =
         {"loci",  required_argument, nullptr, 'l'},
         {"vcf",   required_argument, nullptr, 'v'},
         {"tau",   required_argument, nullptr, 't'},
+        {"dry",   no_argument,       &dry_flag, 1},
         {nullptr, no_argument,       nullptr, 0}
     };
 
@@ -32,9 +34,8 @@ void print_help() {
         "-n, --normal <NORMAL>  normal sample's germline VCF result\n"
         "-l, --loci <LOCI>      candidate loci files\n"
         "-v, --vcf <VCF>        tumor samples' somatic VCF result\n"
-        "-t, --tau <TAU>        optional threshold for somatic score, default is -3"
-        "--verbose              set verbose flag\n"
-        "--brief                set brief flag, mutual exclusive to --verbose\n";
+        "-t, --tau <TAU>        optional threshold for somatic score, default is -3\n"
+        "--dry                  dry run flag\n";
     exit(1);
 }
 
@@ -150,19 +151,21 @@ int main(int argc, char **argv) {
         for (const auto &l : chrom.second) {
             moss::Pileups col = streamer.get_column();
             const auto& array = col.get_read_columns();
-            moss::BaseSet normal;
-            // TODO: baseset
-            uint8_t tumor;
-            unsigned long Z;
-            auto log_proba_non_soma = caller.calling(l, col, normal, tumor, Z);
-            if (log_proba_non_soma < tau) {
-                std::string states(std::bitset<sizeof(Z)>(Z).to_string());
-                std::cout << "Pos: " << l+1 << '\t' << "Prob: " << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << '\t'
-                          << states.substr(states.size() - num_tumor_samples, num_tumor_samples) << '\t';
-                for (const auto &sample : array) {
-                    std::cout << sample.size() << ' ';
+            if (!dry_flag) {
+                moss::BaseSet normal;
+                // TODO: baseset
+                uint8_t tumor;
+                unsigned long Z;
+                auto log_proba_non_soma = caller.calling(l, col, normal, tumor, Z);
+                if (log_proba_non_soma < tau) {
+                    std::string states(std::bitset<sizeof(Z)>(Z).to_string());
+                    std::cout << "Pos: " << l+1 << '\t' << "Prob: " << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << '\t'
+                            << states.substr(states.size() - num_tumor_samples, num_tumor_samples) << '\t';
+                    for (const auto &sample : array) {
+                        std::cout << sample.size() << ' ';
+                    }
+                    std::cout <<  std::endl;
                 }
-                std::cout <<  std::endl;
             }
         }
     }

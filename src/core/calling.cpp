@@ -11,8 +11,6 @@
 
 using namespace moss;
 
-unsigned count_1bits[16] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
-
 // TODO: limited number of tumor samples?
 // - Use custom arbitrary long binary indicator?
 SnvCaller::SnvCaller(int n_tumor_sample, std::string normal, double mu, double stepSize, int max_depth)
@@ -67,7 +65,6 @@ BaseSet SnvCaller::normal_calling(const std::vector<Read> &column, uint8_t ref) 
     return BaseSet(ref);
 }
 
-// TODO: use GT in VCF file
 BaseSet SnvCaller::normal_calling(locus_t pos, uint8_t ref) {
     const auto &normal_pos = normal_result.get_pos();
     const auto &normal_pass = normal_result.get_filter();
