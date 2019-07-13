@@ -37,7 +37,7 @@ namespace moss {
         hts_idx_t *index;
         bam_hdr_t *header;
 //    mplp_ref_t *ref;
-        const mplp_conf_t *conf;
+        // const mplp_conf_t *conf;
     };
 
 

@@ -8,8 +8,9 @@
 #include "core/calling.h"
 #include "core/types.h"
 #include <array>
+#include <math.h>
 
-static int dry_flag = 0;
+int dry_flag = 0;
 
 const option long_options[] =
     {
@@ -19,6 +20,7 @@ const option long_options[] =
         {"loci",  required_argument, nullptr, 'l'},
         {"vcf",   required_argument, nullptr, 'v'},
         {"tau",   required_argument, nullptr, 't'},
+        {"mu",    required_argument, nullptr, 'm'},
         {"dry",   no_argument,       &dry_flag, 1},
         {nullptr, no_argument,       nullptr, 0}
     };
@@ -32,9 +34,10 @@ void print_help() {
         "                       specify\n"
         "-r, --ref <FASTA>      reference FASTA file\n"
         "-n, --normal <NORMAL>  normal sample's germline VCF result\n"
-        "-l, --loci <LOCI>      candidate loci files\n"
+        "-l, --loci <LOCI>      candidate loci files, 0-based\n"
         "-v, --vcf <VCF>        tumor samples' somatic VCF result\n"
-        "-t, --tau <TAU>        optional threshold for somatic score, default is -3\n"
+        "-t, --tau <TAU>        optional threshold for somatic score, default is 0\n"
+        "-m, --mu <MU>          1 - 5x10^(-m), default is 1-5e-6\n"
         "--dry                  dry run flag\n";
     exit(1);
 }
@@ -47,7 +50,7 @@ bool is_file_exist(const std::string& name) {
 
 int main(int argc, char **argv) {
     int c;
-    const char* const short_opts = "b:r:n:l:v:t:h";
+    const char* const short_opts = "b:r:n:l:v:t:m:h";
 
 
     // variables
@@ -57,7 +60,8 @@ int main(int argc, char **argv) {
     std::vector<std::string> bam_idx;
     std::vector<std::string> loci_files;
     std::vector<std::string> tumor_vcfs;
-    double tau(-3.0);
+    double tau{0};
+    double mu{1-5e-6};
 
     /* getopt_long stores the option index here. */
     int option_index = 0;
@@ -101,6 +105,10 @@ int main(int argc, char **argv) {
                 tau = std::stod(optarg);
                 break;
 
+            case 'm':
+                mu = 1 - 5 * pow10(-std::stod(optarg));
+                break;
+
             case '?':
             case 'h':
             default:
@@ -117,13 +125,17 @@ int main(int argc, char **argv) {
         putchar('\n');
     }
 
+    if (dry_flag == 1) {
+        std::cout << "# Dry run!" << std::endl;
+    }
+
     if (!is_file_exist(ref_file)) {
         std::cerr << "Error: Failed to open reference file " << ref_file << std::endl;
         return 1;
     } else {
-        std::cout << "Reference FASTA file: " << ref_file << std::endl;
+        std::cout << "# Reference FASTA file: " << ref_file << std::endl;
     }
-    std::cout << "BAM files:\t";
+    std::cout << "# BAM files:\t";
     for (const std::string &bamFile : bam_files) {
         std::string indexFile = bamFile + ".bai";
         if (!is_file_exist(bamFile)) {
@@ -135,23 +147,29 @@ int main(int argc, char **argv) {
         }
         std::cout << bamFile << '\t';
     }
-    std::cout << std::endl << "Loci files:\t";
+    std::cout << std::endl << "# Loci files:\t";
     for (const auto &lociFile : loci_files) {
         std::cout << lociFile << '\t';
     }
-    std::cout << "tau = " << tau << std::endl;
+    std::cout << "tau = " << tau << "mu = " << mu << std::endl;
 
     unsigned long num_tumor_samples = bam_files.size() - 1;
 //    auto loci = moss::merge_loci(loci_files);
-    auto loci = moss::merge_vcf(tumor_vcfs);
-    std::cout << "## Loci merged" << std::endl;
-    moss::SnvCaller caller(num_tumor_samples, normal_vcf);
+    moss::MapContigLoci loci;
+    if (tumor_vcfs.size() > 0) {
+        loci = moss::merge_vcf(tumor_vcfs);
+    } else if (loci_files.size() > 0) {
+        loci = moss::merge_loci(loci_files);
+    }
+    std::cout << "# Loci merged" << std::endl;
+    moss::SnvCaller caller(num_tumor_samples, normal_vcf, mu);
     moss::BamStreamer streamer(ref_file, bam_files, loci);
+    std::cout << "## Pos \t Prob \t Alt \t Z   \t Coverage" << std::endl;
     for (const auto &chrom : loci) {
         for (const auto &l : chrom.second) {
             moss::Pileups col = streamer.get_column();
             const auto& array = col.get_read_columns();
-            if (!dry_flag) {
+            if (dry_flag == 0) {
                 moss::BaseSet normal;
                 // TODO: baseset
                 uint8_t tumor;
@@ -159,7 +177,7 @@ int main(int argc, char **argv) {
                 auto log_proba_non_soma = caller.calling(l, col, normal, tumor, Z);
                 if (log_proba_non_soma < tau) {
                     std::string states(std::bitset<sizeof(Z)>(Z).to_string());
-                    std::cout << "Pos: " << l+1 << '\t' << "Prob: " << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << '\t'
+                    std::cout << l+1 << '\t' << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << '\t'
                             << states.substr(states.size() - num_tumor_samples, num_tumor_samples) << '\t';
                     for (const auto &sample : array) {
                         std::cout << sample.size() << ' ';
@@ -171,3 +189,4 @@ int main(int argc, char **argv) {
     }
     exit(0);
 }
+
