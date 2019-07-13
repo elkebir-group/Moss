@@ -17,7 +17,10 @@ SnvCaller::SnvCaller(int n_tumor_sample, std::string normal, double mu, double s
     : n_tumor_sample(n_tumor_sample), normal_result(Vcf(normal)), mu(mu), stepSize(stepSize), max_depth(max_depth) {
     gridSize = static_cast<int>(1 / stepSize + 1);
     logNoisePriorComplement = log(1 - mu);
-    logPriorZComplement = logNoisePriorComplement - log((1 << n_tumor_sample) - 1);
+    logPriorZComplement = new double [n_tumor_sample];
+    for (int idx = 0; idx < n_tumor_sample; idx++) {
+        logPriorZComplement[idx] = logNoisePriorComplement - log((1 << idx+1) - 1);
+    }
     logMu = log1p(mu - 1);
     logUniform = -log(gridSize - 1);
     eps = 0.1;
@@ -25,6 +28,7 @@ SnvCaller::SnvCaller(int n_tumor_sample, std::string normal, double mu, double s
     p_err = new double *[n_tumor_sample];
     is_normal = new bool *[n_tumor_sample];
     is_tumor = new bool *[n_tumor_sample];
+    is_empty = new bool [n_tumor_sample];
     for (int idx_sample = 0; idx_sample < n_tumor_sample; ++idx_sample) {
         p_err[idx_sample] = new double[max_depth];
         is_normal[idx_sample] = new bool[max_depth];
@@ -44,6 +48,7 @@ SnvCaller::~SnvCaller() {
     delete[](p_err);
     delete[](is_normal);
     delete[](is_tumor);
+    delete[](is_empty);
     delete[](n_tumor);
     delete[](n_normal);
 }
@@ -119,6 +124,7 @@ SnvCaller::likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet nor
                 unsigned long sample_size = sample.size();
                 for (int j = 0; j < sample_size; ++j) {
                     if (is_normal[idx_sample][j]) {
+                        // TODO: 1 + p_err[idx_sample][j] * (normal_bases.size() - 4) / 3
                         lhood += log(f * p_err[idx_sample][j] / 3 + (1 - f) * (1 - p_err[idx_sample][j]));
                     } else if (is_tumor[idx_sample][j * n_gt + idx_base]) {
                         lhood += log(f * (1 - p_err[idx_sample][j]) + (1 - f) * p_err[idx_sample][j] / 3);
@@ -144,10 +150,19 @@ double SnvCaller::calling(locus_t pos, const Pileups &pile, BaseSet &normal_gt, 
     const std::vector<std::vector<Read>> &columns = pile.get_read_columns();
     uint8_t ref = pile.get_ref();
     normal_gt = normal_calling(pos, ref);
-    // BaseSet tumor_bases = BaseSet::set_difference(0x0f_8, ref);
     BaseSet tumor_bases = normal_gt.complement();
     Array3D lhood = likelihood(std::vector<std::vector<moss::Read>>(columns.begin() + 1, columns.end()), normal_gt,
                                tumor_bases);
+    size_t n_valid_tumor_sample = 0;
+    for (int i = 1; i < columns.size(); i++)
+    {
+        if (columns[i].size() == 0) {
+            is_empty[i-1] = true;
+        } else {
+            is_empty[i-1] = false;
+            n_valid_tumor_sample++;
+        }
+    }
 
     // pre-compute integral of log likelihood under z = 0, 1
     // integral over frequency, P(D_i | Z_i=z_i, Gn)
@@ -179,6 +194,9 @@ double SnvCaller::calling(locus_t pos, const Pileups &pile, BaseSet &normal_gt, 
         for (int z = 0; z < (1 << n_tumor_sample); ++z) {
             double llh = 0;
             for (int idx_sample = 0; idx_sample < n_tumor_sample; ++idx_sample) {
+                if (is_empty[idx_sample]) {
+                    continue;
+                }
                 int z_sample = (z >> idx_sample) & 1;
                 llh += z_sample ? llh_integral[idx_sample][idx_nuc] : lhood[idx_sample][idx_nuc][0];
             }
@@ -187,7 +205,7 @@ double SnvCaller::calling(locus_t pos, const Pileups &pile, BaseSet &normal_gt, 
                 log_sum_exp_iter(max_nume_elem, nume, temp);
                 log_sum_exp_iter(max_evidence_elem, evidence, temp);
             } else {
-                log_sum_exp_iter(max_evidence_elem, evidence, llh + logPriorZComplement);
+                log_sum_exp_iter(max_evidence_elem, evidence, llh + logPriorZComplement[n_valid_tumor_sample - 1]);
             }
         }
         evidence = log_sum_exp_final(max_evidence_elem, evidence);
@@ -201,8 +219,10 @@ double SnvCaller::calling(locus_t pos, const Pileups &pile, BaseSet &normal_gt, 
     }
     Z = 0;
     for (int i = 0; i < n_tumor_sample; ++i) {
-        if (lhood[i][tumor_gt_idx][0] < llh_integral[i][tumor_gt_idx]) {
-            Z |= (1 << i);
+        if (!is_empty[i]) {
+            if (lhood[i][tumor_gt_idx][0] < llh_integral[i][tumor_gt_idx]) {
+                Z |= (1 << i);
+            }
         }
     }
     double log_prob_non_soma = log_sum_exp_final(max_nume_elem, nume) - log_sum_exp_final(max_deno_elem, deno);

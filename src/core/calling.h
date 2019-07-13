@@ -61,7 +61,7 @@ namespace moss {
         double stepSize,
                 logUniform,
                 mu,
-                logPriorZComplement,
+                *logPriorZComplement,
                 logMu,
                 logNoisePriorComplement,
                 eps;
@@ -69,6 +69,7 @@ namespace moss {
         double** p_err;
         bool** is_normal;
         bool** is_tumor;
+        bool* is_empty;
         int* n_tumor;
         int* n_normal;
 
