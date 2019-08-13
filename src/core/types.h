@@ -38,6 +38,8 @@ namespace moss {
 
         bool contain(uint8_t nuc);
 
+        bool is_valid();
+
         uint8_t get_set();
 
         static BaseSet set_difference(uint8_t a, uint8_t b);
@@ -113,17 +115,14 @@ namespace moss {
         uint8_t get_ref() const;
     };
 
-//    class ReadsColumn {
-//    private:
-//        const int n_samples;
-//        std::vector<std::vector<Read>> columns;
-//    public:
-//        ReadsColumn(int n_reads, std::vector<Read> &column);
-//
-//        const int get_len() const;
-//
-//        const Read& get_read(int index) const;
-//    };
+    typedef struct _Annotation{
+        std::vector<int> genotype;
+        std::vector<int> cnt_read;
+        std::vector<int> cnt_tumor;
+
+        _Annotation(int num_samples) : genotype(num_samples, 0), cnt_read(num_samples, 0), cnt_tumor(num_samples, 0) {}
+    } Annotation;
+    
 }
 
 #endif //MOSS_TYPES_H

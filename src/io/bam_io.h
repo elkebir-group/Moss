@@ -18,28 +18,25 @@ namespace moss {
 
     using Buffer = std::deque<std::vector<Read>>;
 
-    using mplp_conf_t = struct {
+    struct _mplp_conf_t {
         int min_mq, flag, min_baseQ, capQ_thres, max_depth, max_indel_depth, fmt_flag, all;
         int rflag_require, rflag_filter;
         int openQ, extQ, tandemQ, min_support; // for indels
         double min_frac; // for indels
         char *reg, *pl_list, *fai_fname, *output_fname;
-//        faidx_t *fai;
         void *bed, *rghash;
         int argc;
         char **argv;
-//        sam_global_args ga;
     };
+    using mplp_conf_t = _mplp_conf_t;
 
-    using data_t = struct {
+    struct _data_t {
         samFile *sam_fp;
         hts_itr_multi_t *iter;
         hts_idx_t *index;
         bam_hdr_t *header;
-//    mplp_ref_t *ref;
-        // const mplp_conf_t *conf;
     };
-
+    using data_t = _data_t;
 
     class BamStreamer {
     private:

@@ -34,15 +34,18 @@ moss::MapContigLoci moss::merge_loci(std::vector<std::string> filenames) {
 moss::MapContigLoci moss::merge_vcf(std::vector<std::string> filenames) {
     MapContigLoci loci;
     for (const auto &filename : filenames) {
-        Vcf vcf(filename);
-        auto pos = vcf.get_pos();
-        auto chrom = vcf.get_chrom();
-        for (const auto &p : pos) {
-            auto item = loci.find(chrom[p.second]);
+        VcfReader vcf(filename);
+        for (auto &&chrom_pos : vcf.get_records()) {
+            auto item = loci.find(chrom_pos.first);
             if (item != loci.end()) {
-                item->second.insert(p.first);
+                for (auto &&pos_rec : chrom_pos.second) {
+                    item->second.insert(pos_rec.first);
+                }
             } else {
-                loci.insert(std::make_pair(chrom[p.second], std::set<unsigned long>({p.first})));
+                loci.insert(std::make_pair(chrom_pos.first, std::set<unsigned long>()));
+                for (auto &&pos_rec : chrom_pos.second) {
+                    loci.at(chrom_pos.first).insert(pos_rec.first);
+                }
             }
         }
     }

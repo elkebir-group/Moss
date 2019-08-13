@@ -30,6 +30,10 @@ uint8_t Pileups::get_ref() const {
 
 BaseSet::BaseSet(uint8_t base) : set(base) {}
 
+bool BaseSet::is_valid() {
+    return (0xf0_8 & set) == 0x00_8;
+}
+
 uint8_t BaseSet::get_set(){
     return set;
 }

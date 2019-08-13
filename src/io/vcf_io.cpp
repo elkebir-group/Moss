@@ -5,149 +5,180 @@
 #include <utility>
 #include <fstream>
 #include <sstream>
+#include <htslib/hfile.h>
 #include <htslib/hts.h>
 #include "vcf_io.h"
 
 using namespace moss;
 
 const unsigned char seq_nt16_table[256] = {
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    1, 2, 4, 8, 15,15,15,15, 15,15,15,15, 15, 0 /*=*/,15,15,
-    15, 1,14, 2, 13,15,15, 4, 11,15,15,12, 15, 3,15,15,
-    15,15, 5, 6,  8,15, 7, 9, 15,10,15,15, 15,15,15,15,
-    15, 1,14, 2, 13,15,15, 4, 11,15,15,12, 15, 3,15,15,
-    15,15, 5, 6,  8,15, 7, 9, 15,10,15,15, 15,15,15,15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    1, 2, 4, 8, 15, 15, 15, 15, 15, 15, 15, 15, 15, 0 /*=*/, 15, 15,
+    15, 1, 14, 2, 13, 15, 15, 4, 11, 15, 15, 12, 15, 3, 15, 15,
+    15, 15, 5, 6, 8, 15, 7, 9, 15, 10, 15, 15, 15, 15, 15, 15,
+    15, 1, 14, 2, 13, 15, 15, 4, 11, 15, 15, 12, 15, 3, 15, 15,
+    15, 15, 5, 6, 8, 15, 7, 9, 15, 10, 15, 15, 15, 15, 15, 15,
 
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15,
-    15,15,15,15, 15,15,15,15, 15,15,15,15, 15,15,15,15
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15
 };
 
-Vcf::Vcf(const std::string &filename) : filename(filename) {
-    std::ifstream ifile{filename};
-    if (ifile) {
-        bool has_GT = false;
-        uint32_t cnt = 0;
-        while (!ifile.eof()) {
-            std::string line;
-            std::getline(ifile, line);
-            if (line.size() > 0) {
-                if (line.at(0) == '#') {
-                    if (line.compare(2, 6, "FORMAT") == 0){
-                        if (line.compare(13, 2, "GT") == 0) {
-                            has_GT = true;
-                        }
-                    }
+VcfReader::VcfReader(const std::string &filename) : filename(filename) {
+    hFILE *fp = hopen(filename.c_str(), "r");
+    htsFormat format;
+    hts_detect_format(fp, &format);
+    hclose(fp);
+    bcf_hdr_t *header;
+    bcf1_t *rec;
+    htsFile *ifile;
+    ifile = bcf_open(filename.c_str(), get_mode(&format).c_str());
+    if (ifile != nullptr) {
+        header = bcf_hdr_read(ifile);
+        bcf1_t *rec = bcf_init();
+        int ngt,
+            *gt = nullptr,
+            ngt_arr = 0;
+        uint8_t normal_gt;
+        while (bcf_read(ifile, header, rec) == 0) {
+            if (bcf_is_snp(rec)) {
+                const char *contig = bcf_hdr_id2name(header, rec->rid);
+                ngt = bcf_get_format_int32(header, rec, "GT", &gt, &ngt_arr);
+                if (ngt == 1 && gt[0] != 0) {
+                    normal_gt = seq_nt16_table[*rec->d.allele[0]] |
+                                seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[0])]];
+                } else if (ngt == 2 && gt[0] != 0) {
+                    normal_gt = seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[0])]] |
+                                seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[1])]];
                 } else {
-                    std::stringstream ss{line};
-                    std::string chrom_s;
-                    std::string temp;
-                    std::string id_s;
-                    std::string ref_s;
-                    std::string alt_s;
-                    std::string filter_s;
-                    bool snv_b = true;
-                    std::getline(ss, chrom_s, '\t');
-                    chrom.emplace_back(chrom_s);
-                    std::getline(ss, temp, '\t');
-                    pos[std::stoi(temp) - 1] = cnt;
-                    cnt++;
-                    std::getline(ss, id_s, '\t');
-                    id.emplace_back(id_s);
-                    std::getline(ss, ref_s, '\t');
-                    if (ref_s.size() > 1) {
-                        snv_b = false;
-                    }
-                    ref.emplace_back(seq_nt16_table[ref_s[0]]);
-                    std::getline(ss, alt_s, '\t');
-                    if (alt_s.size() > 0) {
-                        std::stringstream alt_ss {alt_s};
-                        std::string allele;
-                        alt.emplace_back(std::vector<uint8_t>());
-                        while (std::getline(alt_ss, allele, ',')) {
-                            if (allele.size() == 1) {
-                                alt.back().emplace_back(seq_nt16_table[allele[0]]);
-                            } else {
-                                snv_b = false;
-                            }
-                        }
-                    }
-                    is_snv.push_back(snv_b);
-                    std::getline(ss, temp, '\t');
-                    if (temp == ".") {
-                        qual.emplace_back(-1);
-                    } else {
-                        qual.emplace_back(std::stoi(temp));
-                    }
-                    std::getline(ss, filter_s, '\t');
-                    filter.emplace_back(filter_s);
-                    std::getline(ss, temp, '\t');
-                    std::getline(ss, temp, '\t');
-                    if (has_GT) {
-                        int idx_gt = 0;
-                        {
-                            std::stringstream sample{temp};
-                            std::string field;
-                            while (std::getline(sample, field, ':')) {
-                                if (field.compare(0, 2, std::string{"GT"}) == 0) {
-                                    break;
-                                }
-                                idx_gt++;
-                            }
-                        }
-                        std::getline(ss, temp, '\t');
-                        {
-                            std::stringstream sample{temp};
-                            std::string field;
-                            int idx = 0;
-                            while (std::getline(sample, field, ':')) {
-                                if (idx == idx_gt) {
-                                    if (field.size() == 3) {
-                                        if ((field[0] == '0' && field[2] == '1') ||
-                                            (field[0] == '1' && field[2] == '0')) {
-                                            gt.emplace_back(BaseSet(ref.back() | alt.back()[0]));
-                                        } else if ((field[0] == '0' && field[2] == '2') ||
-                                                   (field[0] == '2' && field[2] == '0')) {
-                                            gt.emplace_back(BaseSet(ref.back() | alt.back()[2]));
-                                        } else if ((field[0] == '1' && field[2] == '2') ||
-                                                   (field[0] == '2' && field[2] == '1')) {
-                                            gt.emplace_back(BaseSet(alt.back()[0] | alt.back()[1]));
-                                        } else if (field[0] == '1' && field[2] == '1') {
-                                            gt.emplace_back(BaseSet(alt.back()[0]));
-                                        }
-                                    }
-                                    break;
-                                }
-                                idx++;
-                            }
-                        }
-                    }
+                    normal_gt = 0xff_8;
                 }
-
+                bool is_rec_pass = bcf_has_filter(header, rec, "PASS");
+                auto search = records.find(contig);
+                if (search != records.end()) {
+                    search->second.emplace(std::make_pair(rec->pos, RecData{BaseSet{normal_gt}, is_rec_pass}));
+                } else {
+                    records.emplace(std::make_pair(contig,
+                                                   std::map<locus_t, RecData>{{rec->pos,
+                                                                               RecData{BaseSet{normal_gt},
+                                                                                       is_rec_pass}}}));
+                }
+            } else {
+                continue;
             }
         }
+        if (rec != nullptr) {
+            bcf_destroy(rec);
+        }
+        if (ngt >= 0) {
+            free(gt);
+        }
+        bcf_close(ifile);
+        bcf_hdr_destroy(header);
+    } else {
+        exit(1);
     }
 }
 
-const std::map<locus_t, uint32_t> &Vcf::get_pos() const {
-    return pos;
+VcfReader::~VcfReader() {
 }
 
-const std::vector<std::string> &Vcf::get_filter() const {
-    return filter;
+RecData VcfReader::find(const std::string &contig, locus_t pos) {
+    auto search_contig = records.find(contig);
+    if (search_contig != records.end()) {
+        auto search_pos = search_contig->second.find(pos);
+        if (search_pos != search_contig->second.end()) {
+            return search_pos->second;
+        } else {
+            return RecData{BaseSet(0xff), false};
+        }
+    } else {
+        return RecData{BaseSet(0xff), false};
+    }
 }
 
-const std::vector<BaseSet> &Vcf::get_gt() const {
-    return gt;
+std::string VcfReader::get_mode(htsFormat *format) {
+    switch (format->format) {
+        case bcf:
+            return "rb";
+            break;
+
+        case vcf:
+            if (format->compression == gzip) {
+                return "rz";
+            } else if (format->compression == no_compression) {
+                return "r";
+            } else {
+                return "r";
+            }
+            break;
+
+        default:
+            return "r";
+            break;
+    }
 }
 
-const std::vector<std::string> &Vcf::get_chrom() const {
-    return chrom;
+const std::map<std::string, std::map<locus_t, RecData>> &VcfReader::get_records() const {
+    return records;
+}
+
+VcfWriter::VcfWriter(const std::string &filename, MapContigLoci loci, unsigned long num_tumor_samples) {
+    ofile = bcf_open(filename.c_str(), "w");
+    header = bcf_hdr_init("w");
+    // FILTER
+    bcf_hdr_append(header, "##FILTER=<ID=PASS,Description=\"All filters passed\">");
+    bcf_hdr_append(header, "##FILTER=<ID=LOW_QUAL,Description=\"QUAL is below the threshold\">");
+    // FORMAT
+    bcf_hdr_append(header,
+                   "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read depth at this position for this sample\">");
+    bcf_hdr_append(header,
+                   "##FORMAT=<ID=TCOUNT,Number=1,Type=Integer,Description=\"Number of tumor reads at this position for this sample\">");
+    // TODO: get length from reference or VCF
+    for (const auto &chrom : loci) {
+        bcf_hdr_append(header, ("##contig=<ID=" + chrom.first + ",length=0>").c_str());
+    }
+    // TODO: use sample name if they have one
+    for (size_t i = 0; i < num_tumor_samples; i++) {
+        bcf_hdr_add_sample(header, ("sample" + std::to_string(i)).c_str());
+    }
+    bcf_hdr_write(ofile, header);
+    filter_pass_id = bcf_hdr_id2int(header, BCF_DT_ID, "PASS");
+    filter_low_id = bcf_hdr_id2int(header, BCF_DT_ID, "LOW_QUAL");
+    rec = bcf_init();
+}
+
+VcfWriter::~VcfWriter() {
+    bcf_hdr_destroy(header);
+    bcf_destroy(rec);
+    bcf_close(ofile);
+}
+
+void
+VcfWriter::write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, float qual, int *depth, int *tumor_count,
+                        float thr, int num_tumor_samples) {
+    bcf_update_filter(header, rec, NULL, 0);
+    rec->qual = qual;
+    rec->pos = pos;
+    rec->rid = bcf_hdr_name2id(header, chrom.c_str());
+    std::string alleles{seq_nt16_str[ref]};
+    alleles += ",";
+    alleles += seq_nt16_str[alt];
+    bcf_update_alleles_str(header, rec, alleles.c_str());
+    bcf_update_format_int32(header, rec, "DP", depth, num_tumor_samples);
+    bcf_update_format_int32(header, rec, "TCOUNT", tumor_count, num_tumor_samples);
+    if (qual < thr) {
+        bcf_update_filter(header, rec, &filter_pass_id, 1);
+    } else {
+        bcf_update_filter(header, rec, &filter_low_id, 1);
+    }
+    bcf_write(ofile, header, rec);
+    bcf_clear(rec);
 }

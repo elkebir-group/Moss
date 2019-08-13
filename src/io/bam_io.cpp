@@ -124,7 +124,11 @@ BamStreamer::BamStreamer(std::string ref_file_name, const std::vector<std::strin
                          int min_baseQ) : num_samples(bam_file_names.size()), min_base_qual(min_baseQ),
                                           reference(std::move(ref_file_name)), loci(loci),
                                           tids(bam_file_names.size(), -1) {
-    ref_fp = fai_load(reference.c_str());
+    // ref_fp = fai_load(reference.c_str());
+    ref_fp = fai_load3(reference.c_str(), (reference + ".fai").c_str(), nullptr, 0x0);
+    if (ref_fp == nullptr) {
+        std::cerr << "Error: Failed to open reference file " << reference << std::endl;
+    }
     meta.reserve(num_samples);
     htsFormat fmt = {};
     for (const std::string &bamFile : bam_file_names) {
@@ -293,13 +297,22 @@ Pileups BamStreamer::get_column() {
             int len_seq;
             char *temp = faidx_fetch_seq(ref_fp, meta[j][0]->header->target_name[tids[j]], actives[j].front(),
                                          actives[j].front(), &len_seq);
-            read_col.set_ref(temp[0]);
-            free(temp);
+            if (temp != nullptr) {
+                read_col.set_ref(temp[0]);
+                free(temp);
+            } else {
+                std::cerr << "Error BamStreamer::get_column: reference error." << std::endl;
+                exit(EXIT_FAILURE);
+            }
         }
 
         actives[j].pop_front();
-        read_col.emplace_read_column(std::move(buffers[j].front()));
-        buffers[j].pop_front();
+        if (buffers[j].empty()) {
+            read_col.emplace_read_column(std::vector<Read>());
+        } else {
+            read_col.emplace_read_column(std::move(buffers[j].front()));
+            buffers[j].pop_front();
+        }
 //        std::cout << cnt << std::endl;
     }
 

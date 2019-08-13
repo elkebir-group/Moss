@@ -8,33 +8,52 @@
 #include <string>
 #include <vector>
 #include <map>
+#include "htslib/vcf.h"
 #include "../core/types.h"
 
 namespace moss {
     using filter_t = uint32_t;
 
-    class Vcf {
+    struct _RecData {
+        BaseSet bases;
+        bool is_pass;
+    };
+
+    using RecData = _RecData;
+
+    class VcfReader {
     private:
         std::string filename;
-        std::vector<std::string> chrom;
-        std::map<locus_t, uint32_t> pos;
-        std::vector<std::string> id;
-        std::vector<uint8_t> ref;
-        std::vector<std::vector<uint8_t>> alt;
-        std::vector<BaseSet> gt;
-        std::vector<uint32_t> qual;
-        std::vector<std::string> filter;
-        std::vector<bool> is_snv;
+        std::map<std::string, std::map<locus_t, RecData>> records;
+
+        std::string get_mode(htsFormat *format);
+
     public:
-        explicit Vcf(const std::string &filename);
+        explicit VcfReader(const std::string &filename);
 
-        const std::map<locus_t, uint32_t> &get_pos() const;
+        ~VcfReader();
 
-        const std::vector<std::string> &get_filter() const;
+        RecData find(const std::string &contig, locus_t pos);
 
-        const std::vector<BaseSet> &get_gt() const;
+        const std::map<std::string, std::map<locus_t, RecData>> &get_records() const;
+    };
 
-        const std::vector<std::string> &get_chrom() const;
+    class VcfWriter {
+    private:
+        bcf_hdr_t *header;
+        bcf1_t *rec;
+        htsFile *ofile;
+
+        int filter_pass_id;
+        int filter_low_id;
+    public:
+        VcfWriter(const std::string &filename, MapContigLoci loci, unsigned long num_tumor_samples);
+
+        ~VcfWriter();
+
+        void
+        write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, float qual, int *depth, int *tumor_count,
+                     float thr, int num_tumor_samples);
     };
 }
 

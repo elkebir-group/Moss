@@ -16,11 +16,13 @@ const option long_options[] =
     {
         {"bam",   required_argument, nullptr, 'b'},
         {"ref",   required_argument, nullptr, 'r'},
+        {"output",required_argument, nullptr, 'o'},
         {"normal",required_argument, nullptr, 'n'},
         {"loci",  required_argument, nullptr, 'l'},
         {"vcf",   required_argument, nullptr, 'v'},
         {"tau",   required_argument, nullptr, 't'},
         {"mu",    required_argument, nullptr, 'm'},
+        {"max_dep", required_argument, nullptr, 'd'},
         {"dry",   no_argument,       &dry_flag, 1},
         {nullptr, no_argument,       nullptr, 0}
     };
@@ -33,11 +35,13 @@ void print_help() {
         "                       one sample, can be addressed multiple times to\n"
         "                       specify\n"
         "-r, --ref <FASTA>      reference FASTA file\n"
+        "-o, --output <OUT>     output VCF file\n"
         "-n, --normal <NORMAL>  normal sample's germline VCF result\n"
         "-l, --loci <LOCI>      candidate loci files, 0-based\n"
         "-v, --vcf <VCF>        tumor samples' somatic VCF result\n"
         "-t, --tau <TAU>        optional threshold for somatic score, default is 0\n"
         "-m, --mu <MU>          1 - 5x10^(-m), default is 1-5e-6\n"
+        "-d, --max_dep <depth>  max depth of the dataset\n, (500)\n"
         "--dry                  dry run flag\n";
     exit(1);
 }
@@ -50,18 +54,20 @@ bool is_file_exist(const std::string& name) {
 
 int main(int argc, char **argv) {
     int c;
-    const char* const short_opts = "b:r:n:l:v:t:m:h";
+    const char* const short_opts = "b:r:o:n:l:v:t:m:d:h";
 
 
     // variables
     std::string ref_file;
     std::string normal_vcf;
+    std::string out_vcf;
     std::vector<std::string> bam_files;
     std::vector<std::string> bam_idx;
     std::vector<std::string> loci_files;
     std::vector<std::string> tumor_vcfs;
     double tau{0};
     double mu{1-5e-6};
+    int max_depth{500};
 
     /* getopt_long stores the option index here. */
     int option_index = 0;
@@ -89,6 +95,10 @@ int main(int argc, char **argv) {
                 ref_file = std::string(optarg);
                 break;
 
+            case 'o':
+                out_vcf = std::string(optarg);
+                break;
+
             case 'n':
                 normal_vcf = std::string(optarg);
                 break;
@@ -106,7 +116,11 @@ int main(int argc, char **argv) {
                 break;
 
             case 'm':
-                mu = 1 - 5 * pow10(-std::stod(optarg));
+                mu = 1 - 5 * pow(10, -std::stod(optarg));
+                break;
+
+            case 'd':
+                max_depth = std::stoi(optarg);
                 break;
 
             case '?':
@@ -149,9 +163,36 @@ int main(int argc, char **argv) {
     }
     std::cout << std::endl << "# Loci files:\t";
     for (const auto &lociFile : loci_files) {
-        std::cout << lociFile << '\t';
+        if (!is_file_exist(lociFile)) {
+            std::cerr << "Error: Failed to open loci file " << lociFile << std::endl;
+            return 1;
+        } else {
+            std::cout << lociFile << '\t';
+        }
     }
-    std::cout << "tau = " << tau << "mu = " << mu << std::endl;
+    std::cout << std::endl << "# Input VCF files:\t";
+    if (!is_file_exist(normal_vcf)) {
+        std::cerr << "Error: Failed to open VCF file " << normal_vcf << std::endl;
+        return 1;
+    } else {
+        std::cout << normal_vcf << '\t';
+    }
+    for (const auto &tumor_vcf : tumor_vcfs) {
+        if (!is_file_exist(tumor_vcf)) {
+            std::cerr << "Error: Failed to open VCF file " << tumor_vcf << std::endl;
+            return 1;
+        } else {
+            std::cout << tumor_vcf << '\t';
+        }
+    }
+    std::cout << std::endl << "# Output VCF file:\t";
+    if (out_vcf.empty()) {
+        std::cerr << std::endl << "Error: No VCF file specified. Use `-o output.vcf` option to specify." << std::endl;
+        return 1;
+    } else {
+        std::cout << out_vcf << std::endl;
+    }
+    std::cout << "tau = " << tau << " mu = " << mu << std::endl;
 
     unsigned long num_tumor_samples = bam_files.size() - 1;
 //    auto loci = moss::merge_loci(loci_files);
@@ -162,9 +203,11 @@ int main(int argc, char **argv) {
         loci = moss::merge_loci(loci_files);
     }
     std::cout << "# Loci merged" << std::endl;
-    moss::SnvCaller caller(num_tumor_samples, normal_vcf, mu);
+    moss::SnvCaller caller(num_tumor_samples, normal_vcf, mu, max_depth);
     moss::BamStreamer streamer(ref_file, bam_files, loci);
-    std::cout << "## Pos \t Prob \t Alt \t Z   \t Coverage" << std::endl;
+    std::cout << "## Pos \t Prob \t Alt \t Genotype:TumorCount:Coverage" << std::endl;
+    moss::Annotation anno(num_tumor_samples);
+    moss::VcfWriter writer{out_vcf, loci, num_tumor_samples};
     for (const auto &chrom : loci) {
         for (const auto &l : chrom.second) {
             moss::Pileups col = streamer.get_column();
@@ -174,16 +217,21 @@ int main(int argc, char **argv) {
                 // TODO: baseset
                 uint8_t tumor;
                 unsigned long Z;
-                auto log_proba_non_soma = caller.calling(l, col, normal, tumor, Z);
+                auto log_proba_non_soma = caller.calling(chrom.first.c_str(), l, col, normal, tumor, Z, anno);
+
+                writer.write_record(chrom.first, l + 1, col.get_ref(), tumor, -10 * log_proba_non_soma, anno.cnt_read.data(), anno.cnt_tumor.data(), -10 * tau, num_tumor_samples);
+
                 if (log_proba_non_soma < tau) {
                     std::string states(std::bitset<sizeof(Z)>(Z).to_string());
-                    std::cout << l+1 << '\t' << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << '\t'
-                            << states.substr(states.size() - num_tumor_samples, num_tumor_samples) << '\t';
-                    for (const auto &sample : array) {
-                        std::cout << sample.size() << ' ';
+                    std::cout << l+1 << '\t' << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << '\t';
+                    for (size_t i = 0; i < num_tumor_samples; i++) {
+                        std::cout << "0|" << anno.genotype[i] << ':'
+                                  << anno.cnt_tumor[i] << ','
+                                  << anno.cnt_read[i] << '\t';
                     }
                     std::cout <<  std::endl;
                 }
+
             }
         }
     }

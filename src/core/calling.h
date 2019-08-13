@@ -18,6 +18,8 @@ namespace moss {
 
     double trinomial(unsigned long s, unsigned long k, unsigned long t);
 
+    enum class Bool : bool {False = false, True = true};
+
     /*!
      * perform log sum exp trick in one pass
      * @tparam T : numerical that supports add and log
@@ -52,7 +54,7 @@ namespace moss {
 
     class SnvCaller {
     private:
-        Vcf normal_result;
+        VcfReader normal_result;
         int n_tumor_sample,
             gridSize,
             max_depth;
@@ -66,16 +68,16 @@ namespace moss {
                 logNoisePriorComplement,
                 eps;
 
-        double** p_err;
-        bool** is_normal;
-        bool** is_tumor;
-        bool* is_empty;
-        int* n_tumor;
-        int* n_normal;
+        std::vector<std::vector<double>> p_err;
+        std::vector<std::vector<char>> is_normal;
+        std::vector<std::vector<char>> is_tumor;
+        std::vector<bool> is_empty;
+        std::vector<int> n_tumor;   //* count of tumor allels in samples: n_tumor_sample x n_tumor_bases
+        std::vector<int> n_normal;  //* count of normal allels in samples: n_tumor_sample
 
         BaseSet normal_calling(const std::vector<Read> &column, uint8_t ref);
 
-        BaseSet normal_calling(locus_t pos, uint8_t ref);
+        BaseSet normal_calling(const std::string &contig, locus_t pos, uint8_t ref);
 
         /*!
          * Calculate log likelihood of each samples given tumor base and VAF,
@@ -90,11 +92,9 @@ namespace moss {
 
     public:
 
-        SnvCaller(int n_tumor_sample, std::string normal, double mu = 1.0 - 5e-6, double stepSize = 0.05, int max_depth = 500);
+        SnvCaller(int n_tumor_sample, std::string normal, double mu = 1.0 - 5e-6, int max_depth = 500, double stepSize = 0.05);
 
-        virtual ~SnvCaller();
-
-        double calling(locus_t pos, const Pileups &pile, BaseSet &normal_gt, uint8_t &tumor_gt, unsigned long &Z);
+        double calling(const std::string &chrom, locus_t pos, const Pileups &pile, BaseSet &normal_gt, uint8_t &tumor_gt, unsigned long &Z, Annotation &anno);
     };
 }
 
