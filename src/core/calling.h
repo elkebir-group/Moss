@@ -18,6 +18,8 @@ namespace moss {
 
     double trinomial(unsigned long s, unsigned long k, unsigned long t);
 
+    double log_trinomial(unsigned long s, unsigned long k, unsigned long t);
+
     enum class Bool : bool {False = false, True = true};
 
     /*!

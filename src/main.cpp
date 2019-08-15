@@ -9,6 +9,7 @@
 #include "core/types.h"
 #include <array>
 #include <math.h>
+#include <chrono>
 
 int dry_flag = 0;
 
@@ -171,18 +172,22 @@ int main(int argc, char **argv) {
         }
     }
     std::cout << std::endl << "# Input VCF files:\t";
-    if (!is_file_exist(normal_vcf)) {
-        std::cerr << "Error: Failed to open VCF file " << normal_vcf << std::endl;
-        return 1;
-    } else {
-        std::cout << normal_vcf << '\t';
-    }
-    for (const auto &tumor_vcf : tumor_vcfs) {
-        if (!is_file_exist(tumor_vcf)) {
-            std::cerr << "Error: Failed to open VCF file " << tumor_vcf << std::endl;
+    if (!normal_vcf.empty()) {
+        if (!is_file_exist(normal_vcf)) {
+            std::cerr << "Error: Failed to open VCF file " << normal_vcf << std::endl;
             return 1;
         } else {
-            std::cout << tumor_vcf << '\t';
+            std::cout << normal_vcf << '\t';
+        }
+    }
+    for (const auto &tumor_vcf : tumor_vcfs) {
+        if (!tumor_vcf.empty()) {
+            if (!is_file_exist(tumor_vcf)) {
+                std::cerr << "Error: Failed to open VCF file " << tumor_vcf << std::endl;
+                return 1;
+            } else {
+                std::cout << tumor_vcf << '\t';
+            }
         }
     }
     std::cout << std::endl << "# Output VCF file:\t";
@@ -203,15 +208,26 @@ int main(int argc, char **argv) {
         loci = moss::merge_loci(loci_files);
     }
     std::cout << "# Loci merged" << std::endl;
+    auto start = std::chrono::system_clock::now();
     moss::SnvCaller caller(num_tumor_samples, normal_vcf, mu, max_depth);
-    moss::BamStreamer streamer(ref_file, bam_files, loci);
-    std::cout << "## Pos \t Prob \t Alt \t Genotype:TumorCount:Coverage" << std::endl;
+    auto end = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end-start;
+    std::cout << "SnvCaller elapsed time: " << elapsed_seconds.count() << std::endl;
+    std::cout << "## Chrom\tPos \t Prob \t Alt \t Genotype:TumorCount:Coverage" << std::endl;
     moss::Annotation anno(num_tumor_samples);
+    start = std::chrono::system_clock::now();
     moss::VcfWriter writer{out_vcf, loci, num_tumor_samples};
+    end = std::chrono::system_clock::now();
+    elapsed_seconds = end-start;
+    std::cout << "Writer elapsed time: " << elapsed_seconds.count() << std::endl;
     for (const auto &chrom : loci) {
+        start = std::chrono::system_clock::now();
+        moss::BamStreamer streamer(ref_file, bam_files, moss::MapContigLoci{{chrom.first, chrom.second}});
+        end = std::chrono::system_clock::now();
+        elapsed_seconds = end-start;
+        std::cout << "Streamer elapsed time: " << elapsed_seconds.count() << std::endl;
         for (const auto &l : chrom.second) {
             moss::Pileups col = streamer.get_column();
-            const auto& array = col.get_read_columns();
             if (dry_flag == 0) {
                 moss::BaseSet normal;
                 // TODO: baseset
@@ -219,11 +235,11 @@ int main(int argc, char **argv) {
                 unsigned long Z;
                 auto log_proba_non_soma = caller.calling(chrom.first.c_str(), l, col, normal, tumor, Z, anno);
 
-                writer.write_record(chrom.first, l + 1, col.get_ref(), tumor, -10 * log_proba_non_soma, anno.cnt_read.data(), anno.cnt_tumor.data(), -10 * tau, num_tumor_samples);
+                writer.write_record(chrom.first, l, col.get_ref(), tumor, -10 * log_proba_non_soma, anno.cnt_read.data(), anno.cnt_tumor.data(), -10 * tau, num_tumor_samples);
 
                 if (log_proba_non_soma < tau) {
                     std::string states(std::bitset<sizeof(Z)>(Z).to_string());
-                    std::cout << l+1 << '\t' << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << '\t';
+                    std::cout << chrom.first << '\t' << l+1 << '\t' << -10 * log_proba_non_soma << '\t' << seq_nt16_str[tumor] << '\t';
                     for (size_t i = 0; i < num_tumor_samples; i++) {
                         std::cout << "0|" << anno.genotype[i] << ':'
                                   << anno.cnt_tumor[i] << ','
@@ -235,6 +251,6 @@ int main(int argc, char **argv) {
             }
         }
     }
-    exit(0);
+    return 0;
 }
 

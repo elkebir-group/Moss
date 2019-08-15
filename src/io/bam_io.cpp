@@ -235,13 +235,20 @@ Pileups BamStreamer::get_column() {
                     break;
                 }
                 uint32_t *cigar = bam_get_cigar(b);
-//                for (int i = 0; i < b->core.n_cigar; ++i) {
-//                    std::cout << (cigar[i] >> BAM_CIGAR_SHIFT) << BAM_CIGAR_STR[cigar[i] & BAM_CIGAR_MASK];
-//                }
                 locus_t begin = b->core.pos;
                 locus_t end = bam_endpos(b);
-//                std::cout << '\t' << b->core.pos << '\t' << b->core.l_qseq << '\t' << end << std::endl;
                 cnt++;
+                // next contig
+                if (b->core.tid != tids[j]) {
+                    tids[j] = b->core.tid;
+                    windows[j].second = 0;
+                    if (iters.size() <= j) {
+                        iters.push_back(
+                            this->loci.at(std::string(meta[j][0]->header->target_name[b->core.tid])).cbegin());
+                    } else {
+                        iters[j] = (this->loci.at(std::string(meta[j][0]->header->target_name[b->core.tid])).cbegin());
+                    }
+                }
                 if (b->core.tid < 0 || (b->core.flag & BAM_FUNMAP)) {
                     continue;
                 }
@@ -250,16 +257,7 @@ Pileups BamStreamer::get_column() {
                 if (end > windows[j].second) {
                     windows[j].second = end;
                 }
-                // check iter
-                if (b->core.tid != tids[j]) {
-                    tids[j] = b->core.tid;
-                    if (iters.size() <= j) {
-                        iters.push_back(
-                            this->loci.at(std::string(meta[j][0]->header->target_name[b->core.tid])).cbegin());
-                    } else {
-                        iters[j] = (this->loci.at(std::string(meta[j][0]->header->target_name[b->core.tid])).cbegin());
-                    }
-                }
+                
                 // find new active loci
                 while (*iters[j] <= windows[j].second) {
                     if (iters[j] != this->loci.at(std::string(meta[j][0]->header->target_name[b->core.tid])).cend()) {
@@ -306,14 +304,15 @@ Pileups BamStreamer::get_column() {
             }
         }
 
-        actives[j].pop_front();
+        if (!actives[j].empty()) {
+            actives[j].pop_front();
+        }
         if (buffers[j].empty()) {
             read_col.emplace_read_column(std::vector<Read>());
         } else {
             read_col.emplace_read_column(std::move(buffers[j].front()));
             buffers[j].pop_front();
         }
-//        std::cout << cnt << std::endl;
     }
 
     bam_destroy1(b);

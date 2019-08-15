@@ -15,7 +15,7 @@ using namespace moss;
 // - Use custom arbitrary long binary indicator?
 SnvCaller::SnvCaller(int n_tumor_sample, std::string normal, double mu, int max_depth, double stepSize)
     : n_tumor_sample(n_tumor_sample),
-      normal_result(VcfReader(normal)),
+      normal_result(std::move(VcfReader(normal))),
       mu(mu),
       max_depth(max_depth),
       stepSize(stepSize),
@@ -80,10 +80,10 @@ SnvCaller::likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet nor
         for (auto r = sample.begin(); r != sample.end(); ++r, ++idx_read) {
             if (idx_read >= max_depth) {
                 max_depth *= 2;
-                for (int idx_sample = 0; idx_sample < n_tumor_sample; ++idx_sample) {
-                    p_err[idx_sample].resize(max_depth);
-                    is_normal[idx_sample].resize(max_depth);
-                    is_tumor[idx_sample].resize(max_depth * 3);
+                for (int i = 0; i < n_tumor_sample; ++i) {
+                    p_err[i].resize(max_depth);
+                    is_normal[i].resize(max_depth);
+                    is_tumor[i].resize(max_depth * 3);
                 }
             }
             p_err[idx_sample].at(idx_read) = qphred2prob(r->qual);
@@ -118,17 +118,22 @@ SnvCaller::likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet nor
                 for (int j = 0; j < sample_size; ++j) {
                     if (is_normal[idx_sample][j]) {
                         lhood += log(f * p_err[idx_sample][j] / 3 +
-                                     (1 - f) * (1 + p_err[idx_sample][j] * (normal_bases.size() - 4) / 3));
+                                     (1 - f) * (1 + p_err[idx_sample][j] * (double(normal_bases.size()) - 4.0) / 3));
+                        assert(lhood <= 0);
                     } else if (is_tumor[idx_sample][j * n_gt + idx_base]) {
                         lhood += log(f * (1 - p_err[idx_sample][j]) + (1 - f) * p_err[idx_sample][j] / 3);
+                        assert(lhood <= 0);
                     } else {
                         // f * err / 3 + (1-f) * err / 3
                         lhood += log(p_err[idx_sample][j]) - log(3);
+                        assert(lhood <= 0);
                     }
                 }
                 unsigned int n_t = n_tumor[idx_sample * n_gt + idx_base];
                 unsigned long n_n = n_normal[idx_sample];
-                base_llh_1d.push_back(lhood + log(trinomial(sample_size - n_n - n_t, n_n, n_t)));
+                double coeff = log_trinomial(sample_size - n_n - n_t, n_n, n_t);
+                assert(!std::isinf(coeff));
+                base_llh_1d.push_back(lhood + coeff);
             }
             sample_llh_2d.emplace_back(base_llh_1d);
             ++idx_base;
@@ -144,7 +149,11 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
                    unsigned long &Z, Annotation &annos) {
     const std::vector<std::vector<Read>> &columns = pile.get_read_columns();
     uint8_t ref = pile.get_ref();
-    normal_gt = normal_calling(chrom, pos, ref);
+    if (normal_result.empty()) {
+        normal_gt = normal_calling(columns[0], ref);
+    } else {
+        normal_gt = normal_calling(chrom, pos, ref);
+    }
     BaseSet tumor_bases = normal_gt.complement();
     Array3D lhood = likelihood(std::vector<std::vector<moss::Read>>(columns.begin() + 1, columns.end()), normal_gt,
                                tumor_bases);
@@ -253,6 +262,30 @@ double moss::binom(unsigned int n, unsigned int k) {
 
 double moss::trinomial(unsigned long s, unsigned long k, unsigned long t) {
     return binom(s + k + t, t) * binom(s + k, k);
+}
+
+double moss::log_trinomial(unsigned long s, unsigned long k, unsigned long t) {
+    unsigned long sum = s + k + t;
+    if (sum == 0) {
+        return 0;
+    }
+    double log_tri;
+    int non_zero_count = int(s != 0) + int(k != 0) + int(t != 0);
+    if (sum > 651) {
+        // Stirling's approx.
+        // C++ standard double < 10^308
+        // multinomial(217, 217, 217) is the largest without overflow, => 3*217 = 651
+        log_tri = (sum + 0.5) * log(sum);
+        log_tri -= (s == 0) ? 0 : (s + 0.5) * log(s);
+        log_tri -= (k == 0) ? 0 : (k + 0.5) * log(k);
+        log_tri -= (t == 0) ? 0 : (t + 0.5) * log(t);
+        log_tri -= log(2 * M_PI) * (non_zero_count - 1) / 2;
+    }
+    else
+    {
+        log_tri = log(trinomial(s, k, t));
+    }
+    return log_tri;
 }
 
 template<typename T>

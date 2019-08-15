@@ -32,58 +32,60 @@ const unsigned char seq_nt16_table[256] = {
 };
 
 VcfReader::VcfReader(const std::string &filename) : filename(filename) {
-    hFILE *fp = hopen(filename.c_str(), "r");
-    htsFormat format;
-    hts_detect_format(fp, &format);
-    hclose(fp);
-    bcf_hdr_t *header;
-    bcf1_t *rec;
-    htsFile *ifile;
-    ifile = bcf_open(filename.c_str(), get_mode(&format).c_str());
-    if (ifile != nullptr) {
-        header = bcf_hdr_read(ifile);
-        bcf1_t *rec = bcf_init();
-        int ngt,
-            *gt = nullptr,
-            ngt_arr = 0;
-        uint8_t normal_gt;
-        while (bcf_read(ifile, header, rec) == 0) {
-            if (bcf_is_snp(rec)) {
-                const char *contig = bcf_hdr_id2name(header, rec->rid);
-                ngt = bcf_get_format_int32(header, rec, "GT", &gt, &ngt_arr);
-                if (ngt == 1 && gt[0] != 0) {
-                    normal_gt = seq_nt16_table[*rec->d.allele[0]] |
-                                seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[0])]];
-                } else if (ngt == 2 && gt[0] != 0) {
-                    normal_gt = seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[0])]] |
-                                seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[1])]];
+    if (!filename.empty()) {
+        hFILE *fp = hopen(filename.c_str(), "r");
+        htsFormat format;
+        hts_detect_format(fp, &format);
+        hclose(fp);
+        bcf_hdr_t *header;
+        bcf1_t *rec;
+        htsFile *ifile;
+        ifile = bcf_open(filename.c_str(), get_mode(&format).c_str());
+        if (ifile != nullptr) {
+            header = bcf_hdr_read(ifile);
+            bcf1_t *rec = bcf_init();
+            int ngt,
+                *gt = nullptr,
+                ngt_arr = 0;
+            uint8_t normal_gt;
+            while (bcf_read(ifile, header, rec) == 0) {
+                if (bcf_is_snp(rec)) {
+                    const char *contig = bcf_hdr_id2name(header, rec->rid);
+                    ngt = bcf_get_format_int32(header, rec, "GT", &gt, &ngt_arr);
+                    if (ngt == 1 && gt[0] != 0) {
+                        normal_gt = seq_nt16_table[*rec->d.allele[0]] |
+                                    seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[0])]];
+                    } else if (ngt == 2 && gt[0] != 0) {
+                        normal_gt = seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[0])]] |
+                                    seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[1])]];
+                    } else {
+                        normal_gt = 0xff_8;
+                    }
+                    bool is_rec_pass = bcf_has_filter(header, rec, "PASS");
+                    auto search = records.find(contig);
+                    if (search != records.end()) {
+                        search->second.emplace(std::make_pair(rec->pos, RecData{BaseSet{normal_gt}, is_rec_pass}));
+                    } else {
+                        records.emplace(std::make_pair(contig,
+                                                    std::map<locus_t, RecData>{{rec->pos,
+                                                                                RecData{BaseSet{normal_gt},
+                                                                                        is_rec_pass}}}));
+                    }
                 } else {
-                    normal_gt = 0xff_8;
+                    continue;
                 }
-                bool is_rec_pass = bcf_has_filter(header, rec, "PASS");
-                auto search = records.find(contig);
-                if (search != records.end()) {
-                    search->second.emplace(std::make_pair(rec->pos, RecData{BaseSet{normal_gt}, is_rec_pass}));
-                } else {
-                    records.emplace(std::make_pair(contig,
-                                                   std::map<locus_t, RecData>{{rec->pos,
-                                                                               RecData{BaseSet{normal_gt},
-                                                                                       is_rec_pass}}}));
-                }
-            } else {
-                continue;
             }
+            if (rec != nullptr) {
+                bcf_destroy(rec);
+            }
+            if (ngt >= 0) {
+                free(gt);
+            }
+            bcf_close(ifile);
+            bcf_hdr_destroy(header);
+        } else {
+            exit(1);
         }
-        if (rec != nullptr) {
-            bcf_destroy(rec);
-        }
-        if (ngt >= 0) {
-            free(gt);
-        }
-        bcf_close(ifile);
-        bcf_hdr_destroy(header);
-    } else {
-        exit(1);
     }
 }
 
@@ -130,6 +132,10 @@ const std::map<std::string, std::map<locus_t, RecData>> &VcfReader::get_records(
     return records;
 }
 
+bool VcfReader::empty() {
+    return filename.empty();
+}
+
 VcfWriter::VcfWriter(const std::string &filename, MapContigLoci loci, unsigned long num_tumor_samples) {
     ofile = bcf_open(filename.c_str(), "w");
     header = bcf_hdr_init("w");
@@ -140,7 +146,7 @@ VcfWriter::VcfWriter(const std::string &filename, MapContigLoci loci, unsigned l
     bcf_hdr_append(header,
                    "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read depth at this position for this sample\">");
     bcf_hdr_append(header,
-                   "##FORMAT=<ID=TCOUNT,Number=1,Type=Integer,Description=\"Number of tumor reads at this position for this sample\">");
+                   "##FORMAT=<ID=TCOUNT,Number=1,Type=Integer,Description=\"Number of reads with alternate allele at this position for this sample \">");
     // TODO: get length from reference or VCF
     for (const auto &chrom : loci) {
         bcf_hdr_append(header, ("##contig=<ID=" + chrom.first + ",length=0>").c_str());
@@ -156,9 +162,9 @@ VcfWriter::VcfWriter(const std::string &filename, MapContigLoci loci, unsigned l
 }
 
 VcfWriter::~VcfWriter() {
+    bcf_close(ofile);
     bcf_hdr_destroy(header);
     bcf_destroy(rec);
-    bcf_close(ofile);
 }
 
 void
@@ -174,7 +180,7 @@ VcfWriter::write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, fl
     bcf_update_alleles_str(header, rec, alleles.c_str());
     bcf_update_format_int32(header, rec, "DP", depth, num_tumor_samples);
     bcf_update_format_int32(header, rec, "TCOUNT", tumor_count, num_tumor_samples);
-    if (qual < thr) {
+    if (qual > thr) {
         bcf_update_filter(header, rec, &filter_pass_id, 1);
     } else {
         bcf_update_filter(header, rec, &filter_low_id, 1);

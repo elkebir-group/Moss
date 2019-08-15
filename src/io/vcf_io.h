@@ -36,6 +36,8 @@ namespace moss {
         RecData find(const std::string &contig, locus_t pos);
 
         const std::map<std::string, std::map<locus_t, RecData>> &get_records() const;
+
+        bool empty(void);
     };
 
     class VcfWriter {
