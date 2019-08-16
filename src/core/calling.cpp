@@ -13,16 +13,20 @@ using namespace moss;
 
 // TODO: limited number of tumor samples?
 // - Use custom arbitrary long binary indicator?
-SnvCaller::SnvCaller(int n_tumor_sample, std::string normal, double mu, int max_depth, double stepSize)
+SnvCaller::SnvCaller(int n_tumor_sample, std::string normal, double mu, int max_depth, int grid_size)
     : n_tumor_sample(n_tumor_sample),
       normal_result(std::move(VcfReader(normal))),
       mu(mu),
       max_depth(max_depth),
-      stepSize(stepSize),
+      gridSize(grid_size),
       is_empty(n_tumor_sample),
       n_tumor(n_tumor_sample * 3),
-      n_normal(n_tumor_sample) {
-    gridSize = static_cast<int>(1 / stepSize + 1);
+      n_normal(n_tumor_sample),
+      p_err(n_tumor_sample, std::vector<double>(max_depth)),
+      is_normal(n_tumor_sample, std::vector<char>(max_depth)),
+      is_tumor(n_tumor_sample, std::vector<char>(max_depth * 3)),
+      likelihoods(n_tumor_sample, std::vector<std::vector<double>>(3, std::vector<double>(grid_size))) {
+    stepSize = 1.0 / (gridSize - 1);
     logNoisePriorComplement = log(1 - mu);
     logPriorZComplement = new double[n_tumor_sample];
     for (int idx = 0; idx < n_tumor_sample; idx++) {
@@ -31,15 +35,10 @@ SnvCaller::SnvCaller(int n_tumor_sample, std::string normal, double mu, int max_
     logMu = log1p(mu - 1);
     logUniform = -log(gridSize - 1);
     eps = 0.1;
+}
 
-    p_err.reserve(n_tumor_sample);
-    is_normal.reserve(n_tumor_sample);
-    is_tumor.reserve(n_tumor_sample);
-    for (int idx_sample = 0; idx_sample < n_tumor_sample; ++idx_sample) {
-        p_err.emplace_back(std::vector<double>(max_depth));
-        is_normal.emplace_back(std::vector<char>(max_depth));
-        is_tumor.emplace_back(std::vector<char>(max_depth * 3));
-    }
+SnvCaller::~SnvCaller() {
+    delete[](logPriorZComplement);
 }
 
 BaseSet SnvCaller::normal_calling(const std::vector<Read> &column, uint8_t ref) {
@@ -68,8 +67,8 @@ BaseSet SnvCaller::normal_calling(const std::string &contig, locus_t pos, uint8_
     }
 }
 
-Array3D
-SnvCaller::likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet normal_bases, BaseSet tumor_base) {
+void
+SnvCaller::calc_likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet normal_bases, BaseSet tumor_base) {
     // pre-calculate
     auto n_gt = tumor_base.size();
     std::fill(n_normal.begin(), n_normal.end(), 0);
@@ -100,19 +99,13 @@ SnvCaller::likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet nor
         idx_sample++;
     }
     // n_tumor_sample x n_tumor_base x gridSize
-    Array3D loglikelihood_3d;
-    loglikelihood_3d.reserve(n_tumor_sample);
     idx_sample = 0;
     for (const auto &sample : aligned) {
-        std::vector<std::vector<double>> sample_llh_2d;
-        sample_llh_2d.reserve(tumor_base.size());
         int idx_base = 0;
         for (const auto &base : tumor_base) {
-            std::vector<double> base_llh_1d;
-            base_llh_1d.reserve(gridSize);
-            for (int i = 0; i < gridSize; ++i) {
+            for (int idx_step = 0; idx_step < gridSize; ++idx_step) {
                 double lhood = 0;
-                double f = i * stepSize;
+                double f = idx_step * stepSize;
                 unsigned long sample_size = sample.size();
                 assert(sample_size < max_depth);
                 for (int j = 0; j < sample_size; ++j) {
@@ -133,15 +126,12 @@ SnvCaller::likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet nor
                 unsigned long n_n = n_normal[idx_sample];
                 double coeff = log_trinomial(sample_size - n_n - n_t, n_n, n_t);
                 assert(!std::isinf(coeff));
-                base_llh_1d.push_back(lhood + coeff);
+                likelihoods[idx_sample][idx_base][idx_step] = lhood + coeff;
             }
-            sample_llh_2d.emplace_back(base_llh_1d);
             ++idx_base;
         }
-        loglikelihood_3d.emplace_back(sample_llh_2d);
         ++idx_sample;
     }
-    return loglikelihood_3d;
 }
 
 double
@@ -155,8 +145,7 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
         normal_gt = normal_calling(chrom, pos, ref);
     }
     BaseSet tumor_bases = normal_gt.complement();
-    Array3D lhood = likelihood(std::vector<std::vector<moss::Read>>(columns.begin() + 1, columns.end()), normal_gt,
-                               tumor_bases);
+    calc_likelihood(std::vector<std::vector<moss::Read>>(columns.begin() + 1, columns.end()), normal_gt, tumor_bases);
     size_t n_valid_tumor_sample = 0;
     for (int i = 1; i < columns.size(); i++) {
         if (columns[i].size() == 0) {
@@ -165,7 +154,6 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
             is_empty[i - 1] = false;
             n_valid_tumor_sample++;
         }
-        // annos.emplace_back(0, columns[i].size(), -1);
         annos.cnt_read[i - 1] = columns[i].size();
     }
 
@@ -173,12 +161,11 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
     // integral over frequency, P(D_i | Z_i=z_i, Gn)
     std::vector<std::vector<double> > llh_integral(n_tumor_sample);
     int idx_sample = 0;
-    for (const auto &sample : lhood) {
-        int idx_base = 0;
+    for (const auto &sample : likelihoods) {
         llh_integral[idx_sample].resize(tumor_bases.size());
-        for (const auto &sample_base : sample) {
+        for (int idx_base = 0; idx_base < tumor_bases.size(); ++idx_base) {
+            const auto &sample_base = sample[idx_base];
             llh_integral[idx_sample][idx_base] = log_sum_exp(sample_base) + logUniform;
-            idx_base++;
         }
         idx_sample++;
     }
@@ -203,7 +190,7 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
                     continue;
                 }
                 int z_sample = (z >> idx_sample) & 1;
-                llh += z_sample ? llh_integral[idx_sample][idx_nuc] : lhood[idx_sample][idx_nuc][0];
+                llh += z_sample ? llh_integral[idx_sample][idx_nuc] : likelihoods[idx_sample][idx_nuc][0];
             }
             if (z == 0) {
                 double temp = llh + logMu;
@@ -224,7 +211,7 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
     }
     Z = 0;
     for (int i = 0; i < n_tumor_sample; ++i) {
-        if (!is_empty[i] && (lhood[i][tumor_gt_idx][0] < llh_integral[i][tumor_gt_idx])) {
+        if (!is_empty[i] && (likelihoods[i][tumor_gt_idx][0] < llh_integral[i][tumor_gt_idx])) {
             Z |= (1 << i);
             annos.genotype[i] = 1;
         } else {
@@ -280,9 +267,7 @@ double moss::log_trinomial(unsigned long s, unsigned long k, unsigned long t) {
         log_tri -= (k == 0) ? 0 : (k + 0.5) * log(k);
         log_tri -= (t == 0) ? 0 : (t + 0.5) * log(t);
         log_tri -= log(2 * M_PI) * (non_zero_count - 1) / 2;
-    }
-    else
-    {
+    } else {
         log_tri = log(trinomial(s, k, t));
     }
     return log_tri;

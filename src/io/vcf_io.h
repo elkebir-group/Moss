@@ -26,7 +26,7 @@ namespace moss {
         std::string filename;
         std::map<std::string, std::map<locus_t, RecData>> records;
 
-        std::string get_mode(htsFormat *format);
+        static std::string get_mode(htsFormat *format);
 
     public:
         explicit VcfReader(const std::string &filename);
@@ -37,7 +37,7 @@ namespace moss {
 
         const std::map<std::string, std::map<locus_t, RecData>> &get_records() const;
 
-        bool empty(void);
+        bool empty();
     };
 
     class VcfWriter {

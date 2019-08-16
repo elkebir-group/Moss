@@ -20,8 +20,6 @@ namespace moss {
 
     double log_trinomial(unsigned long s, unsigned long k, unsigned long t);
 
-    enum class Bool : bool {False = false, True = true};
-
     /*!
      * perform log sum exp trick in one pass
      * @tparam T : numerical that supports add and log
@@ -81,20 +79,23 @@ namespace moss {
 
         BaseSet normal_calling(const std::string &contig, locus_t pos, uint8_t ref);
 
+        Array3D likelihoods;
+
         /*!
          * Calculate log likelihood of each samples given tumor base and VAF,
          * P( D_j | f_j, z_j, g_t, g_n).
-         * Return a 3D vector of size n_tumor_sample x n_tumor_base x gridSize
+         * modify member lhood, a 3D vector of size n_tumor_sample x n_tumor_base x gridSize
          * @param aligned : aligned columns of tumor samples
          * @param normal_bases : base set of normal given by normal_calling
          * @param tumor_base : return MLE tumor base
-         * @return : 3D vector
          */
-        Array3D likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet normal_bases, BaseSet tumor_base);
+        void calc_likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet normal_bases, BaseSet tumor_base);
 
     public:
 
-        SnvCaller(int n_tumor_sample, std::string normal, double mu = 1.0 - 5e-6, int max_depth = 500, double stepSize = 0.05);
+        SnvCaller(int n_tumor_sample, std::string normal, double mu = 1.0 - 5e-6, int max_depth = 500, int grid_size = 21);
+
+        ~SnvCaller();
 
         double calling(const std::string &chrom, locus_t pos, const Pileups &pile, BaseSet &normal_gt, uint8_t &tumor_gt, unsigned long &Z, Annotation &anno);
     };

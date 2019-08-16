@@ -89,8 +89,7 @@ VcfReader::VcfReader(const std::string &filename) : filename(filename) {
     }
 }
 
-VcfReader::~VcfReader() {
-}
+VcfReader::~VcfReader() = default;
 
 RecData VcfReader::find(const std::string &contig, locus_t pos) {
     auto search_contig = records.find(contig);
@@ -170,7 +169,7 @@ VcfWriter::~VcfWriter() {
 void
 VcfWriter::write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, float qual, int *depth, int *tumor_count,
                         float thr, int num_tumor_samples) {
-    bcf_update_filter(header, rec, NULL, 0);
+    bcf_update_filter(header, rec, nullptr, 0);
     rec->qual = qual;
     rec->pos = pos;
     rec->rid = bcf_hdr_name2id(header, chrom.c_str());

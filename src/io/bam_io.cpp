@@ -220,7 +220,7 @@ Pileups BamStreamer::get_column() {
     Pileups read_col(num_samples);
 
     // begin pileup
-    bam1_t *b = bam_init1();
+    bam1_t *read = bam_init1();
     int ret;
     /*!
      * \details For each sample, get reads until the first active locus in the queue is finished,
@@ -228,28 +228,27 @@ Pileups BamStreamer::get_column() {
      */
     for (int j = 0; j < num_samples; ++j) {
         int cnt = 0;
-        if (actives[j].size() == 0 || windows[j].first <= actives[j][0]) {
+        if (actives[j].empty() || windows[j].first <= actives[j][0]) {
             do {
-                ret = sam_itr_multi_next(meta[j][0]->sam_fp, meta[j][0]->iter, b);
+                ret = sam_itr_multi_next(meta[j][0]->sam_fp, meta[j][0]->iter, read);
                 if (ret < 0) {
                     break;
                 }
-                uint32_t *cigar = bam_get_cigar(b);
-                locus_t begin = b->core.pos;
-                locus_t end = bam_endpos(b);
+                locus_t begin = read->core.pos;
+                locus_t end = bam_endpos(read);
                 cnt++;
                 // next contig
-                if (b->core.tid != tids[j]) {
-                    tids[j] = b->core.tid;
+                if (read->core.tid != tids[j]) {
+                    tids[j] = read->core.tid;
                     windows[j].second = 0;
                     if (iters.size() <= j) {
                         iters.push_back(
-                            this->loci.at(std::string(meta[j][0]->header->target_name[b->core.tid])).cbegin());
+                            this->loci.at(std::string(meta[j][0]->header->target_name[read->core.tid])).cbegin());
                     } else {
-                        iters[j] = (this->loci.at(std::string(meta[j][0]->header->target_name[b->core.tid])).cbegin());
+                        iters[j] = (this->loci.at(std::string(meta[j][0]->header->target_name[read->core.tid])).cbegin());
                     }
                 }
-                if (b->core.tid < 0 || (b->core.flag & BAM_FUNMAP)) {
+                if (read->core.tid < 0 || (read->core.flag & BAM_FUNMAP)) {
                     continue;
                 }
                 // update window
@@ -257,10 +256,10 @@ Pileups BamStreamer::get_column() {
                 if (end > windows[j].second) {
                     windows[j].second = end;
                 }
-                
+
                 // find new active loci
                 while (*iters[j] <= windows[j].second) {
-                    if (iters[j] != this->loci.at(std::string(meta[j][0]->header->target_name[b->core.tid])).cend()) {
+                    if (iters[j] != this->loci.at(std::string(meta[j][0]->header->target_name[read->core.tid])).cend()) {
                         actives[j].emplace_back(*iters[j]);
                         buffers[j].emplace_back(std::vector<Read>());
                         ++iters[j];
@@ -276,12 +275,12 @@ Pileups BamStreamer::get_column() {
 //                int qpos = pos - windows[j].first;          // use cigar!
                     if (pos >= windows[j].first && pos < end) {
                         PileupMeta p{};
-                        resolve_cigar2(b, pos, &c, &p);
-                        if (!p.is_del && p.qpos >= 0 && p.qpos < b->core.l_qseq) {
-                            uint8_t base_qual = bam_get_qual(b)[p.qpos];
+                        resolve_cigar2(read, pos, &c, &p);
+                        if (!p.is_del && p.qpos >= 0 && p.qpos < read->core.l_qseq) {
+                            uint8_t base_qual = bam_get_qual(read)[p.qpos];
                             if (base_qual >= min_base_qual) {
                                 buffers[j][idx_pos].push_back(
-                                    Read{static_cast<uint8_t >(bam_seqi(bam_get_seq(b), p.qpos)),
+                                    Read{static_cast<uint8_t >(bam_seqi(bam_get_seq(read), p.qpos)),
                                          base_qual});
                             }
                         }
@@ -315,7 +314,7 @@ Pileups BamStreamer::get_column() {
         }
     }
 
-    bam_destroy1(b);
+    bam_destroy1(read);
     return read_col;
 }
 
