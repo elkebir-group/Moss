@@ -228,48 +228,8 @@ double moss::qphred2prob(int qphred) {
     return pow(10.f, -static_cast<double>(qphred) / 10.f);
 }
 
-double moss::binom(unsigned int n, unsigned int k) {
-    assert(n >= k);
-    if (n == 0 || n == 1 || k == 0 || k == n) {
-        return 1;
-    }
-    if (k == 1) {
-        return n;
-    }
-    if (2 * k > n) {
-        k = n - k;
-    }
-    double bin = n - k + 1;
-    for (int i = 2, j = n - k + 2; i <= k; ++i, ++j) {
-        bin *= j;
-        bin /= i;
-    }
-    return bin;
-}
-
-double moss::trinomial(unsigned long s, unsigned long k, unsigned long t) {
-    return binom(s + k + t, t) * binom(s + k, k);
-}
-
 double moss::log_trinomial(unsigned long s, unsigned long k, unsigned long t) {
-    unsigned long sum = s + k + t;
-    if (sum == 0) {
-        return 0;
-    }
-    double log_tri;
-    int non_zero_count = int(s != 0) + int(k != 0) + int(t != 0);
-    if (sum > 651) {
-        // Stirling's approx.
-        // C++ standard double < 10^308
-        // multinomial(217, 217, 217) is the largest without overflow, => 3*217 = 651
-        log_tri = (sum + 0.5) * log(sum);
-        log_tri -= (s == 0) ? 0 : (s + 0.5) * log(s);
-        log_tri -= (k == 0) ? 0 : (k + 0.5) * log(k);
-        log_tri -= (t == 0) ? 0 : (t + 0.5) * log(t);
-        log_tri -= log(2 * M_PI) * (non_zero_count - 1) / 2;
-    } else {
-        log_tri = log(trinomial(s, k, t));
-    }
+    double log_tri = std::lgamma(s + k + t + 1) - std::lgamma(s + 1) - std::lgamma(k + 1) - std::lgamma(t + 1);
     return log_tri;
 }
 
@@ -287,6 +247,15 @@ T moss::log_sum_exp(std::vector<T> array) {
         }
     }
     return max_elem + log(accum);
+}
+
+template<typename T>
+T moss::log_sum_exp(T a, T b) {
+    if (a >= b) {
+        return a + log(exp(b - a) + 1.0);
+    } else {
+        return b + log(exp(a - b) + 1.0);
+    }
 }
 
 template<typename T>

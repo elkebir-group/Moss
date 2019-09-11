@@ -14,10 +14,6 @@ namespace moss {
 
     double qphred2prob(int qphred);
 
-    double binom(unsigned int n, unsigned int k);
-
-    double trinomial(unsigned long s, unsigned long k, unsigned long t);
-
     double log_trinomial(unsigned long s, unsigned long k, unsigned long t);
 
     /*!
@@ -28,6 +24,9 @@ namespace moss {
      */
     template<typename T>
     T log_sum_exp(std::vector<T> array);
+
+    template<typename T>
+    T log_sum_exp(T a, T b);
 
     /*!
      * Initialize max_elem to be -infinity, return accumulate.
