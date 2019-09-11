@@ -4,7 +4,6 @@
 
 #include "bam_io.h"
 #include <iostream>
-#include <climits>
 #include <iomanip>
 #include <cstring>
 #include <cassert>
@@ -120,10 +119,12 @@ int resolve_cigar2(bam1_t *b, int32_t pos, cstate_t *s, PileupMeta *p) {
 }
 
 BamStreamer::BamStreamer(std::string ref_file_name, const std::vector<std::string> &bam_file_names,
-                         const MapContigLoci &loci,
-                         int min_baseQ) : num_samples(bam_file_names.size()), min_base_qual(min_baseQ),
-                                          reference(std::move(ref_file_name)), loci(loci),
-                                          tids(bam_file_names.size(), -1) {
+                         const MapContigLoci &loci, int min_baseQ, int min_mapQ) : num_samples(bam_file_names.size()),
+                                                                                   min_base_qual(min_baseQ),
+                                                                                   min_map_qual(min_mapQ),
+                                                                                   reference(std::move(ref_file_name)),
+                                                                                   loci(loci),
+                                                                                   tids(bam_file_names.size(), -1) {
     // ref_fp = fai_load(reference.c_str());
     ref_fp = fai_load3(reference.c_str(), (reference + ".fai").c_str(), nullptr, 0x0);
     if (ref_fp == nullptr) {
@@ -218,7 +219,7 @@ BamStreamer::~BamStreamer() {
 // TODO: do this contig-wise, make sure all samples are in the same contig simultaneously
 Pileups BamStreamer::get_column() {
     Pileups read_col(num_samples);
-
+    bool not_found = true;
     // begin pileup
     bam1_t *read = bam_init1();
     int ret;
@@ -245,11 +246,23 @@ Pileups BamStreamer::get_column() {
                         iters.push_back(
                             this->loci.at(std::string(meta[j][0]->header->target_name[read->core.tid])).cbegin());
                     } else {
-                        iters[j] = (this->loci.at(std::string(meta[j][0]->header->target_name[read->core.tid])).cbegin());
+                        iters[j] = (this->loci.at(
+                            std::string(meta[j][0]->header->target_name[read->core.tid])).cbegin());
                     }
                 }
-                if (read->core.tid < 0 || (read->core.flag & BAM_FUNMAP)) {
+                if (read->core.tid < 0 || (read->core.flag & FAIL_FLAGS)) {
                     continue;
+                }
+                // TODO: optional
+                if (read->core.qual < min_map_qual) {
+                    continue;
+                }
+                uint8_t *nm = bam_aux_get(read, "NM");
+                if (nm) {
+                    int64_t edit_dist = bam_aux2i(nm);
+                    if (edit_dist > 3) {
+                        continue;
+                    }
                 }
                 // update window
                 windows[j].first = begin;
@@ -259,7 +272,8 @@ Pileups BamStreamer::get_column() {
 
                 // find new active loci
                 while (*iters[j] <= windows[j].second) {
-                    if (iters[j] != this->loci.at(std::string(meta[j][0]->header->target_name[read->core.tid])).cend()) {
+                    if (iters[j] !=
+                        this->loci.at(std::string(meta[j][0]->header->target_name[read->core.tid])).cend()) {
                         actives[j].emplace_back(*iters[j]);
                         buffers[j].emplace_back(std::vector<Read>());
                         ++iters[j];
@@ -289,21 +303,22 @@ Pileups BamStreamer::get_column() {
                 }
             } while (windows[j].first <= actives[j][0]);
         }
-        // find reference, only once
-        if (j == 0) {
-            int len_seq;
-            char *temp = faidx_fetch_seq(ref_fp, meta[j][0]->header->target_name[tids[j]], actives[j].front(),
-                                         actives[j].front(), &len_seq);
-            if (temp != nullptr) {
-                read_col.set_ref(temp[0]);
-                free(temp);
-            } else {
-                std::cerr << "Error BamStreamer::get_column: reference error." << std::endl;
-                exit(EXIT_FAILURE);
-            }
-        }
 
         if (!actives[j].empty()) {
+            // find reference, only once
+            if (not_found) {
+                int len_seq;
+                char *temp = faidx_fetch_seq(ref_fp, meta[j][0]->header->target_name[tids[j]], actives[j].front(),
+                                             actives[j].front(), &len_seq);
+                if (temp != nullptr) {
+                    read_col.set_ref(temp[0]);
+                    free(temp);
+                } else {
+                    std::cerr << "Error BamStreamer::get_column: reference error." << std::endl;
+                    exit(EXIT_FAILURE);
+                }
+                not_found = false;
+            }
             actives[j].pop_front();
         }
         if (buffers[j].empty()) {

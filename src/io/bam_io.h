@@ -43,6 +43,7 @@ namespace moss {
         const unsigned long num_samples;
         std::vector<data_t **> meta;
         const int min_base_qual;
+        const int min_map_qual;
         const std::string reference;
         faidx_t *ref_fp;
         const MapContigLoci loci;                           //!< candidate positions
@@ -52,12 +53,14 @@ namespace moss {
         std::vector<std::set<locus_t>::iterator> iters;     //!< iterator point to loci
         std::vector<std::deque<locus_t>> actives;           //!< active loci for each sample
         std::vector<Buffer> buffers;                        //!< buffer for Pileups in building
+        const static uint16_t FAIL_FLAGS = BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP;
 
     public:
         explicit BamStreamer(std::string ref_file_name,
                              const std::vector<std::string> &bam_file_names,
                              const MapContigLoci &loci,
-                             int min_baseQ = 13);
+                             int min_baseQ = 13,
+                             int min_mapQ = 30);
 
         virtual ~BamStreamer();
 

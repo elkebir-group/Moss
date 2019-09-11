@@ -13,9 +13,9 @@ using namespace moss;
 
 // TODO: limited number of tumor samples?
 // - Use custom arbitrary long binary indicator?
-SnvCaller::SnvCaller(int n_tumor_sample, std::string normal, double mu, int max_depth, int grid_size)
+SnvCaller::SnvCaller(int n_tumor_sample, const std::string& normal, double mu, int max_depth, int grid_size)
     : n_tumor_sample(n_tumor_sample),
-      normal_result(std::move(VcfReader(normal))),
+      normal_result(VcfReader(normal)),
       mu(mu),
       max_depth(max_depth),
       gridSize(grid_size),
@@ -27,13 +27,20 @@ SnvCaller::SnvCaller(int n_tumor_sample, std::string normal, double mu, int max_
       is_tumor(n_tumor_sample, std::vector<char>(max_depth * 3)),
       likelihoods(n_tumor_sample, std::vector<std::vector<double>>(3, std::vector<double>(grid_size))) {
     stepSize = 1.0 / (gridSize - 1);
+    logMu = log1p(mu - 1);
     logNoisePriorComplement = log(1 - mu);
     logPriorZComplement = new double[n_tumor_sample];
+    logAll0 = new double[n_tumor_sample];
     for (int idx = 0; idx < n_tumor_sample; idx++) {
         logPriorZComplement[idx] = logNoisePriorComplement - log((1 << (idx + 1)) - 1);
+        // log(1 - \mu * 2^m / (2^m - 1)) = log(2^m - 1 - 2^m(1-MU)) - log(2^m - 1)
+        if (idx == 0) {
+            logAll0[idx] = log1p(mu * (1 << (idx + 1)) - 2) - log1p((1 << (idx + 1)) - 2);
+        } else {
+            logAll0[idx] = log(mu * (1 << (idx + 1)) - 1) - log((1 << (idx + 1)) - 1);
+        }
     }
-    logMu = log1p(mu - 1);
-    logUniform = -log(gridSize - 1);
+    logUniform = -log(gridSize);
     eps = 0.1;
 }
 
@@ -147,20 +154,24 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
     BaseSet tumor_bases = normal_gt.complement();
     calc_likelihood(std::vector<std::vector<moss::Read>>(columns.begin() + 1, columns.end()), normal_gt, tumor_bases);
     size_t n_valid_tumor_sample = 0;
-    for (int i = 1; i < columns.size(); i++) {
-        if (columns[i].size() == 0) {
+    annos.cnt_read[0] = columns[0].size();
+    for (unsigned long i = 1; i < columns.size(); i++) {
+        if (columns[i].empty()) {
             is_empty[i - 1] = true;
         } else {
             is_empty[i - 1] = false;
             n_valid_tumor_sample++;
         }
-        annos.cnt_read[i - 1] = columns[i].size();
+        annos.cnt_read[i] = columns[i].size();
+    }
+    if (n_valid_tumor_sample == 0) {
+        return 0;
     }
 
     // pre-compute integral of log likelihood under z = 0, 1
     // integral over frequency, P(D_i | Z_i=z_i, Gn)
     std::vector<std::vector<double> > llh_integral(n_tumor_sample);
-    int idx_sample = 0;
+    {int idx_sample = 0;
     for (const auto &sample : likelihoods) {
         llh_integral[idx_sample].resize(tumor_bases.size());
         for (int idx_base = 0; idx_base < tumor_bases.size(); ++idx_base) {
@@ -168,56 +179,59 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
             llh_integral[idx_sample][idx_base] = log_sum_exp(sample_base) + logUniform;
         }
         idx_sample++;
-    }
+    }}
     // sum over 2^m-1 of z, and tumor nucleotide
     double max_nume_elem,
+        nume,
         max_deno_elem,
-        max_tumor_evidence = -std::numeric_limits<double>::infinity(),
-        max_evidence_elem;
-    double nume,
-        deno;
+        deno,
+        max_tumor_evidence = -std::numeric_limits<double>::infinity();
+
     log_sum_exp_init(max_nume_elem, nume);
     log_sum_exp_init(max_deno_elem, deno);
     int tumor_gt_idx;
     int idx_nuc = 0;
     for (const auto &tumor_base : tumor_bases) {
-        double evidence;
-        log_sum_exp_init(max_evidence_elem, evidence);
-        for (int z = 0; z < (1 << n_tumor_sample); ++z) {
-            double llh = 0;
-            for (int idx_sample = 0; idx_sample < n_tumor_sample; ++idx_sample) {
-                if (is_empty[idx_sample]) {
-                    continue;
-                }
-                int z_sample = (z >> idx_sample) & 1;
-                llh += z_sample ? llh_integral[idx_sample][idx_nuc] : likelihoods[idx_sample][idx_nuc][0];
+        double nume_gt{},
+            evidence{};
+        for (int idx_sample = 0; idx_sample < n_tumor_sample; ++idx_sample) {
+            if (is_empty[idx_sample]) {
+                continue;
             }
-            if (z == 0) {
-                double temp = llh + logMu;
-                log_sum_exp_iter(max_nume_elem, nume, temp);
-                log_sum_exp_iter(max_evidence_elem, evidence, temp);
-            } else {
-                log_sum_exp_iter(max_evidence_elem, evidence, llh + logPriorZComplement[n_valid_tumor_sample - 1]);
-            }
+            nume_gt += likelihoods[idx_sample][idx_nuc][0];
+            evidence += log_sum_exp(llh_integral[idx_sample][idx_nuc], likelihoods[idx_sample][idx_nuc][0]);
         }
-        evidence = log_sum_exp_final(max_evidence_elem, evidence);
+        evidence = log_sum_exp(
+            evidence + logPriorZComplement[n_valid_tumor_sample - 1],
+            nume_gt + logAll0[n_valid_tumor_sample - 1]);
         if (max_tumor_evidence <= evidence) {
             max_tumor_evidence = evidence;
             tumor_gt = tumor_base;
             tumor_gt_idx = idx_nuc;
         }
+        log_sum_exp_iter(max_nume_elem, nume, nume_gt + logMu);
         log_sum_exp_iter(max_deno_elem, deno, evidence);
         idx_nuc++;
     }
+
     Z = 0;
+    annos.genotype[0] = 0;
+    int normal_tumor_allele_count = 0;
+    for (auto &item : columns[0]) {
+        if (item.base == tumor_gt) {
+            normal_tumor_allele_count++;
+        }
+    }
+    annos.cnt_tumor[0] = normal_tumor_allele_count;
     for (int i = 0; i < n_tumor_sample; ++i) {
         if (!is_empty[i] && (likelihoods[i][tumor_gt_idx][0] < llh_integral[i][tumor_gt_idx])) {
             Z |= (1 << i);
-            annos.genotype[i] = 1;
+            annos.genotype[i + 1] = 1;
         } else {
-            annos.genotype[i] = 0;
+            annos.genotype[i + 1] = 0;
         }
-        annos.cnt_tumor[i] = n_tumor[i * tumor_bases.size() + tumor_gt_idx];
+        annos.cnt_tumor[i + 1] = n_tumor[i * tumor_bases.size() + tumor_gt_idx];
+        annos.zq[i + 1] = -10 * llh_integral[i][tumor_gt_idx];
     }
 
     double log_prob_non_soma = log_sum_exp_final(max_nume_elem, nume) - log_sum_exp_final(max_deno_elem, deno);

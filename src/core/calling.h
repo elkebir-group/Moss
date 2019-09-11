@@ -60,12 +60,13 @@ namespace moss {
         // neucleotide = {'T', 'A', 'G', 'C'};
         // genotype = {"ref": 0, "het": 0.5, "hom": 1};
         double stepSize,
-                logUniform,
-                mu,
-                *logPriorZComplement,
-                logMu,
-                logNoisePriorComplement,
-                eps;
+            logUniform,
+            mu,
+            *logPriorZComplement,
+            *logAll0,
+            logMu,
+            logNoisePriorComplement,
+            eps;
 
         std::vector<std::vector<double>> p_err;
         std::vector<std::vector<char>> is_normal;
@@ -92,11 +93,14 @@ namespace moss {
 
     public:
 
-        SnvCaller(int n_tumor_sample, std::string normal, double mu = 1.0 - 5e-6, int max_depth = 500, int grid_size = 21);
+        SnvCaller(int n_tumor_sample, const std::string& normal, double mu = 1.0 - 5e-6, int max_depth = 500,
+                  int grid_size = 21);
 
         ~SnvCaller();
 
-        double calling(const std::string &chrom, locus_t pos, const Pileups &pile, BaseSet &normal_gt, uint8_t &tumor_gt, unsigned long &Z, Annotation &anno);
+        double
+        calling(const std::string &chrom, locus_t pos, const Pileups &pile, BaseSet &normal_gt, uint8_t &tumor_gt,
+                unsigned long &Z, Annotation &anno);
     };
 }
 

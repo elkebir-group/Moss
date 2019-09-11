@@ -115,14 +115,16 @@ namespace moss {
         uint8_t get_ref() const;
     };
 
-    typedef struct _Annotation{
+    typedef struct _Annotation {
         std::vector<int> genotype;
         std::vector<int> cnt_read;
         std::vector<int> cnt_tumor;
+        std::vector<float> zq;
 
-        _Annotation(int num_samples) : genotype(num_samples, 0), cnt_read(num_samples, 0), cnt_tumor(num_samples, 0) {}
+        _Annotation(int num_samples) : genotype(num_samples, 0), cnt_read(num_samples, 0), cnt_tumor(num_samples, 0),
+                                       zq(num_samples, 0) {}
     } Annotation;
-    
+
 }
 
 #endif //MOSS_TYPES_H

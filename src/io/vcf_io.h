@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include "htslib/vcf.h"
+#include <htslib/faidx.h>
 #include "../core/types.h"
 
 namespace moss {
@@ -45,17 +46,22 @@ namespace moss {
         bcf_hdr_t *header;
         bcf1_t *rec;
         htsFile *ofile;
+        std::string reference;
+        faidx_t *ref_idx;
 
         int filter_pass_id;
         int filter_low_id;
+        int filter_low_normal_id;
     public:
-        VcfWriter(const std::string &filename, MapContigLoci loci, unsigned long num_tumor_samples);
+        VcfWriter(const std::string &filename, MapContigLoci loci, unsigned long num_tumor_samples,
+                  std::string ref_file, std::vector<std::string> bam_files);
 
         ~VcfWriter();
 
         void
-        write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, float qual, int *depth, int *tumor_count,
-                     float thr, int num_tumor_samples);
+        write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, float qual, std::vector<int> depth,
+                     std::vector<int> tumor_count, std::vector<float> zq, std::vector<int> Z,
+                     float thr, int num_samples);
     };
 }
 
