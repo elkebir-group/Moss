@@ -18,34 +18,32 @@ namespace moss {
 
     using Buffer = std::deque<std::vector<Read>>;
 
-    using mplp_conf_t = struct {
+    struct _mplp_conf_t {
         int min_mq, flag, min_baseQ, capQ_thres, max_depth, max_indel_depth, fmt_flag, all;
         int rflag_require, rflag_filter;
         int openQ, extQ, tandemQ, min_support; // for indels
         double min_frac; // for indels
         char *reg, *pl_list, *fai_fname, *output_fname;
-//        faidx_t *fai;
         void *bed, *rghash;
         int argc;
         char **argv;
-//        sam_global_args ga;
     };
+    using mplp_conf_t = _mplp_conf_t;
 
-    using data_t = struct {
+    struct _data_t {
         samFile *sam_fp;
         hts_itr_multi_t *iter;
         hts_idx_t *index;
         bam_hdr_t *header;
-//    mplp_ref_t *ref;
-        const mplp_conf_t *conf;
     };
-
+    using data_t = _data_t;
 
     class BamStreamer {
     private:
         const unsigned long num_samples;
         std::vector<data_t **> meta;
         const int min_base_qual;
+        const int min_map_qual;
         const std::string reference;
         faidx_t *ref_fp;
         const MapContigLoci loci;                           //!< candidate positions
@@ -55,12 +53,14 @@ namespace moss {
         std::vector<std::set<locus_t>::iterator> iters;     //!< iterator point to loci
         std::vector<std::deque<locus_t>> actives;           //!< active loci for each sample
         std::vector<Buffer> buffers;                        //!< buffer for Pileups in building
+        const static uint16_t FAIL_FLAGS = BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP;
 
     public:
         explicit BamStreamer(std::string ref_file_name,
                              const std::vector<std::string> &bam_file_names,
                              const MapContigLoci &loci,
-                             int min_baseQ = 13);
+                             int min_baseQ = 13,
+                             int min_mapQ = 30);
 
         virtual ~BamStreamer();
 

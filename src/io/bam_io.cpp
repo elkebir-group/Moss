@@ -4,7 +4,6 @@
 
 #include "bam_io.h"
 #include <iostream>
-#include <climits>
 #include <iomanip>
 #include <cstring>
 #include <cassert>
@@ -120,11 +119,17 @@ int resolve_cigar2(bam1_t *b, int32_t pos, cstate_t *s, PileupMeta *p) {
 }
 
 BamStreamer::BamStreamer(std::string ref_file_name, const std::vector<std::string> &bam_file_names,
-                         const MapContigLoci &loci,
-                         int min_baseQ) : num_samples(bam_file_names.size()), min_base_qual(min_baseQ),
-                                          reference(std::move(ref_file_name)), loci(loci),
-                                          tids(bam_file_names.size(), -1) {
-    ref_fp = fai_load(reference.c_str());
+                         const MapContigLoci &loci, int min_baseQ, int min_mapQ) : num_samples(bam_file_names.size()),
+                                                                                   min_base_qual(min_baseQ),
+                                                                                   min_map_qual(min_mapQ),
+                                                                                   reference(std::move(ref_file_name)),
+                                                                                   loci(loci),
+                                                                                   tids(bam_file_names.size(), -1) {
+    // ref_fp = fai_load(reference.c_str());
+    ref_fp = fai_load3(reference.c_str(), (reference + ".fai").c_str(), nullptr, 0x0);
+    if (ref_fp == nullptr) {
+        std::cerr << "Error: Failed to open reference file " << reference << std::endl;
+    }
     meta.reserve(num_samples);
     htsFormat fmt = {};
     for (const std::string &bamFile : bam_file_names) {
@@ -214,9 +219,9 @@ BamStreamer::~BamStreamer() {
 // TODO: do this contig-wise, make sure all samples are in the same contig simultaneously
 Pileups BamStreamer::get_column() {
     Pileups read_col(num_samples);
-
+    bool not_found = true;
     // begin pileup
-    bam1_t *b = bam_init1();
+    bam1_t *read = bam_init1();
     int ret;
     /*!
      * \details For each sample, get reads until the first active locus in the queue is finished,
@@ -224,41 +229,51 @@ Pileups BamStreamer::get_column() {
      */
     for (int j = 0; j < num_samples; ++j) {
         int cnt = 0;
-        if (actives[j].size() == 0 || windows[j].first <= actives[j][0]) {
+        if (actives[j].empty() || windows[j].first <= actives[j][0]) {
             do {
-                ret = sam_itr_multi_next(meta[j][0]->sam_fp, meta[j][0]->iter, b);
+                ret = sam_itr_multi_next(meta[j][0]->sam_fp, meta[j][0]->iter, read);
                 if (ret < 0) {
                     break;
                 }
-                uint32_t *cigar = bam_get_cigar(b);
-//                for (int i = 0; i < b->core.n_cigar; ++i) {
-//                    std::cout << (cigar[i] >> BAM_CIGAR_SHIFT) << BAM_CIGAR_STR[cigar[i] & BAM_CIGAR_MASK];
-//                }
-                locus_t begin = b->core.pos;
-                locus_t end = bam_endpos(b);
-//                std::cout << '\t' << b->core.pos << '\t' << b->core.l_qseq << '\t' << end << std::endl;
+                locus_t begin = read->core.pos;
+                locus_t end = bam_endpos(read);
                 cnt++;
-                if (b->core.tid < 0 || (b->core.flag & BAM_FUNMAP)) {
+                // next contig
+                if (read->core.tid != tids[j]) {
+                    tids[j] = read->core.tid;
+                    windows[j].second = 0;
+                    if (iters.size() <= j) {
+                        iters.push_back(
+                            this->loci.at(std::string(meta[j][0]->header->target_name[read->core.tid])).cbegin());
+                    } else {
+                        iters[j] = (this->loci.at(
+                            std::string(meta[j][0]->header->target_name[read->core.tid])).cbegin());
+                    }
+                }
+                if (read->core.tid < 0 || (read->core.flag & FAIL_FLAGS)) {
                     continue;
+                }
+                // TODO: optional
+                if (read->core.qual < min_map_qual) {
+                    continue;
+                }
+                uint8_t *nm = bam_aux_get(read, "NM");
+                if (nm) {
+                    int64_t edit_dist = bam_aux2i(nm);
+                    if (edit_dist > 3) {
+                        continue;
+                    }
                 }
                 // update window
                 windows[j].first = begin;
                 if (end > windows[j].second) {
                     windows[j].second = end;
                 }
-                // check iter
-                if (b->core.tid != tids[j]) {
-                    tids[j] = b->core.tid;
-                    if (iters.size() <= j) {
-                        iters.push_back(
-                            this->loci.at(std::string(meta[j][0]->header->target_name[b->core.tid])).cbegin());
-                    } else {
-                        iters[j] = (this->loci.at(std::string(meta[j][0]->header->target_name[b->core.tid])).cbegin());
-                    }
-                }
+
                 // find new active loci
                 while (*iters[j] <= windows[j].second) {
-                    if (iters[j] != this->loci.at(std::string(meta[j][0]->header->target_name[b->core.tid])).cend()) {
+                    if (iters[j] !=
+                        this->loci.at(std::string(meta[j][0]->header->target_name[read->core.tid])).cend()) {
                         actives[j].emplace_back(*iters[j]);
                         buffers[j].emplace_back(std::vector<Read>());
                         ++iters[j];
@@ -274,12 +289,12 @@ Pileups BamStreamer::get_column() {
 //                int qpos = pos - windows[j].first;          // use cigar!
                     if (pos >= windows[j].first && pos < end) {
                         PileupMeta p{};
-                        resolve_cigar2(b, pos, &c, &p);
-                        if (!p.is_del && p.qpos >= 0 && p.qpos < b->core.l_qseq) {
-                            uint8_t base_qual = bam_get_qual(b)[p.qpos];
+                        resolve_cigar2(read, pos, &c, &p);
+                        if (!p.is_del && p.qpos >= 0 && p.qpos < read->core.l_qseq) {
+                            uint8_t base_qual = bam_get_qual(read)[p.qpos];
                             if (base_qual >= min_base_qual) {
                                 buffers[j][idx_pos].push_back(
-                                    Read{static_cast<uint8_t >(bam_seqi(bam_get_seq(b), p.qpos)),
+                                    Read{static_cast<uint8_t >(bam_seqi(bam_get_seq(read), p.qpos)),
                                          base_qual});
                             }
                         }
@@ -288,22 +303,33 @@ Pileups BamStreamer::get_column() {
                 }
             } while (windows[j].first <= actives[j][0]);
         }
-        // find reference, only once
-        if (j == 0) {
-            int len_seq;
-            char *temp = faidx_fetch_seq(ref_fp, meta[j][0]->header->target_name[tids[j]], actives[j].front(),
-                                         actives[j].front(), &len_seq);
-            read_col.set_ref(temp[0]);
-            free(temp);
-        }
 
-        actives[j].pop_front();
-        read_col.emplace_read_column(std::move(buffers[j].front()));
-        buffers[j].pop_front();
-//        std::cout << cnt << std::endl;
+        if (!actives[j].empty()) {
+            // find reference, only once
+            if (not_found) {
+                int len_seq;
+                char *temp = faidx_fetch_seq(ref_fp, meta[j][0]->header->target_name[tids[j]], actives[j].front(),
+                                             actives[j].front(), &len_seq);
+                if (temp != nullptr) {
+                    read_col.set_ref(temp[0]);
+                    free(temp);
+                } else {
+                    std::cerr << "Error BamStreamer::get_column: reference error." << std::endl;
+                    exit(EXIT_FAILURE);
+                }
+                not_found = false;
+            }
+            actives[j].pop_front();
+        }
+        if (buffers[j].empty()) {
+            read_col.emplace_read_column(std::vector<Read>());
+        } else {
+            read_col.emplace_read_column(std::move(buffers[j].front()));
+            buffers[j].pop_front();
+        }
     }
 
-    bam_destroy1(b);
+    bam_destroy1(read);
     return read_col;
 }
 

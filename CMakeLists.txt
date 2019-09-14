@@ -5,6 +5,7 @@ project(moss LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/build/cmake/modules/")
 
@@ -14,13 +15,14 @@ set(OBJ
     src/main.cpp
     src/io/bam_io.cpp
     src/io/bam_io.h
+    src/io/vcf_io.h
+    src/io/vcf_io.cpp
     src/core/types.h
+    src/core/types.cpp
     src/core/calling.cpp
     src/core/calling.h
-    src/core/types.cpp
     src/io/loci.h
-    src/io/loci.cpp
-)
+    src/io/loci.cpp)
 
 add_executable(moss ${OBJ})
 target_include_directories(moss PUBLIC ${HTSlib_INCLUDE_DIRS})
@@ -31,8 +33,10 @@ set(TEST_FILES
     ${TEST_DIR}/types_tests.cpp
     ${TEST_DIR}/catch.hpp
     ${TEST_DIR}/calling_tests.cpp
-    src/core/calling.cpp src/core/types.cpp
-    test/bam_io_tests.cpp)
+    ${TEST_DIR}/bam_io_tests.cpp
+    src/core/calling.cpp
+    src/core/types.cpp
+    src/io/vcf_io.cpp)
 
 add_executable(test ${TEST_FILES})
 target_include_directories(test PUBLIC ${HTSlib_INCLUDE_DIRS})

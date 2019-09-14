@@ -28,7 +28,6 @@ namespace moss {
     class BaseSet {
     private:
         uint8_t set;
-        std::vector<uint8_t> base_list;
         static const unsigned count_1bits[16];
     public:
         BaseSet() = default;
@@ -39,13 +38,43 @@ namespace moss {
 
         bool contain(uint8_t nuc);
 
-        uint8_t get_set();
+        bool is_valid();
 
-        const std::vector<uint8_t> &get_base_list();
+        uint8_t get_set();
 
         static BaseSet set_difference(uint8_t a, uint8_t b);
 
         BaseSet complement();
+
+        void add_base(uint8_t base);
+
+        class iter {
+        public:
+            iter(uint8_t pos, uint8_t set) : pos(pos), set(set) {}
+
+            iter operator++() {
+                do {
+                    pos <<= 1;
+                } while (((pos & set) == 0) && (pos < (1 << 4)));
+                return *this;
+            }
+
+            bool operator!=(const iter &other) const { return pos != other.pos; }
+
+            const uint8_t operator*() const { return pos; }
+
+        private:
+            uint8_t pos;
+            uint8_t set;
+        };
+
+        iter begin() const {
+            uint8_t mask = 1;
+            while ((mask & set) == 0) { mask <<= 1; }
+            return {mask, set};
+        }
+
+        iter end() const { return {16, set}; }
     };
 
     inline unsigned moss::BaseSet::size() {
@@ -86,17 +115,16 @@ namespace moss {
         uint8_t get_ref() const;
     };
 
-//    class ReadsColumn {
-//    private:
-//        const int n_samples;
-//        std::vector<std::vector<Read>> columns;
-//    public:
-//        ReadsColumn(int n_reads, std::vector<Read> &column);
-//
-//        const int get_len() const;
-//
-//        const Read& get_read(int index) const;
-//    };
+    typedef struct _Annotation {
+        std::vector<int> genotype;
+        std::vector<int> cnt_read;
+        std::vector<int> cnt_tumor;
+        std::vector<float> zq;
+
+        _Annotation(int num_samples) : genotype(num_samples, 0), cnt_read(num_samples, 0), cnt_tumor(num_samples, 0),
+                                       zq(num_samples, 0) {}
+    } Annotation;
+
 }
 
 #endif //MOSS_TYPES_H
