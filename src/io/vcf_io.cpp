@@ -56,11 +56,18 @@ VcfReader::VcfReader(const std::string &filename) : filename(filename) {
                     const char *contig = bcf_hdr_id2name(header, rec->rid);
                     ngt = bcf_get_format_int32(header, rec, "GT", &gt, &ngt_arr);
                     if (ngt == 1 && gt[0] != 0) {
-                        normal_gt = seq_nt16_table[*rec->d.allele[0]] |
-                                    seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[0])]];
+                        normal_gt = seq_nt16_table[*rec->d.allele[0]];
+                        if (*rec->d.allele[bcf_gt_allele(gt[0])] != '*') {
+                            normal_gt |= seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[0])]];
+                        }
                     } else if (ngt == 2 && gt[0] != 0) {
-                        normal_gt = seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[0])]] |
-                                    seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[1])]];
+                        normal_gt = 0;
+                        if (*rec->d.allele[bcf_gt_allele(gt[0])] != '*') {
+                            normal_gt |= seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[0])]];
+                        }
+                        if (*rec->d.allele[bcf_gt_allele(gt[1])] != '*') {
+                            normal_gt |= seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[1])]];
+                        }
                     } else {
                         normal_gt = 0xff_8;
                     }
