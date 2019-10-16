@@ -118,6 +118,51 @@ int resolve_cigar2(bam1_t *b, int32_t pos, cstate_t *s, PileupMeta *p) {
     return 1;
 }
 
+void resolve_cigar(bam1_t *b, int32_t pos, PileupMeta *p) {
+    bam1_core_t *c = &b->core;
+    uint32_t *cigar = bam_get_cigar(b);
+    int dist = pos - c->pos;
+    int qpos = 0;
+    bool is_finish = false;
+    for (int k = 0; k < c->n_cigar; k++) {
+        int op = bam_cigar_op(cigar[k]);
+        int l = bam_cigar_oplen(cigar[k]);
+        switch (op) {
+            case BAM_CMATCH:
+            case BAM_CEQUAL:
+            case BAM_CDIFF:
+                if (dist <= l-1) {
+                    p->qpos = qpos + dist;
+                    is_finish = true;
+                    break;
+                }
+                dist -= l;
+                qpos += l;
+                break;
+            case BAM_CINS:
+            case BAM_CSOFT_CLIP:
+                qpos += l;
+                break;
+            case BAM_CDEL:
+            case BAM_CREF_SKIP:
+                if (dist <= l-1) {
+                    p->is_del = 1;
+                    p->is_refskip = (op == BAM_CREF_SKIP);
+                    is_finish = true;
+                    break;
+                }
+                dist -= l;
+                break;
+            case BAM_CHARD_CLIP:
+            case BAM_CPAD:
+                break;
+        }
+        if (is_finish) {
+            break;
+        }
+    }
+}
+
 BamStreamer::BamStreamer(std::string ref_file_name, const std::vector<std::string> &bam_file_names,
                          const MapContigLoci &loci, int min_baseQ, int min_mapQ) : num_samples(bam_file_names.size()),
                                                                                    min_base_qual(min_baseQ),
@@ -289,7 +334,8 @@ Pileups BamStreamer::get_column() {
 //                int qpos = pos - windows[j].first;          // use cigar!
                     if (pos >= windows[j].first && pos < end) {
                         PileupMeta p{};
-                        resolve_cigar2(read, pos, &c, &p);
+                        // resolve_cigar2(read, pos, &c, &p);
+                        resolve_cigar(read, pos, &p);
                         if (!p.is_del && p.qpos >= 0 && p.qpos < read->core.l_qseq) {
                             uint8_t base_qual = bam_get_qual(read)[p.qpos];
                             if (base_qual >= min_base_qual) {
