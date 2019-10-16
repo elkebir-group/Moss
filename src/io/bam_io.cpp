@@ -164,12 +164,14 @@ void resolve_cigar(bam1_t *b, int32_t pos, PileupMeta *p) {
 }
 
 BamStreamer::BamStreamer(std::string ref_file_name, const std::vector<std::string> &bam_file_names,
-                         const MapContigLoci &loci, int min_baseQ, int min_mapQ) : num_samples(bam_file_names.size()),
-                                                                                   min_base_qual(min_baseQ),
-                                                                                   min_map_qual(min_mapQ),
-                                                                                   reference(std::move(ref_file_name)),
-                                                                                   loci(loci),
-                                                                                   tids(bam_file_names.size(), -1) {
+                         const MapContigLoci &loci, int min_baseQ, int min_mapQ, bool filter_edit_distance)
+    : num_samples(bam_file_names.size()),
+      min_base_qual(min_baseQ),
+      min_map_qual(min_mapQ),
+      reference(std::move(ref_file_name)),
+      loci(loci),
+      tids(bam_file_names.size(), -1),
+      is_filter_edit_distance(filter_edit_distance) {
     // ref_fp = fai_load(reference.c_str());
     ref_fp = fai_load3(reference.c_str(), (reference + ".fai").c_str(), nullptr, 0x0);
     if (ref_fp == nullptr) {
@@ -302,11 +304,13 @@ Pileups BamStreamer::get_column() {
                 if (read->core.qual < min_map_qual) {
                     continue;
                 }
-                uint8_t *nm = bam_aux_get(read, "NM");
-                if (nm) {
-                    int64_t edit_dist = bam_aux2i(nm);
-                    if (edit_dist > 3) {
-                        continue;
+                if (is_filter_edit_distance) {
+                    uint8_t *nm = bam_aux_get(read, "NM");
+                    if (nm) {
+                        int64_t edit_dist = bam_aux2i(nm);
+                        if (edit_dist > 3) {
+                            continue;
+                        }
                     }
                 }
                 // update window

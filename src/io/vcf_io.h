@@ -21,6 +21,7 @@ namespace moss {
     };
 
     using RecData = _RecData;
+    using filter_func = bool (*)(Annotation);
 
     class VcfReader {
     private:
@@ -52,16 +53,18 @@ namespace moss {
         int filter_pass_id;
         int filter_low_id;
         int filter_low_normal_id;
+        int filter_tumor_supp_id;
+        int filter_total_dp_id;
+        int filter_vaf_id;
+        bool is_filter_total_dp;
+
     public:
         VcfWriter(const std::string &filename, MapContigLoci loci, unsigned long num_tumor_samples,
-                  std::string ref_file, std::vector<std::string> bam_files);
+                  std::string ref_file, std::vector<std::string> bam_files, bool filter_total_dp = false);
 
         ~VcfWriter();
 
-        void
-        write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, float qual, std::vector<int> depth,
-                     std::vector<int> tumor_count, std::vector<float> zq, std::vector<int> Z,
-                     float thr, int num_samples);
+        void write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, float qual, Annotation annos, float thr, int num_samples);
     };
 }
 

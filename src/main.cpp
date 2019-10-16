@@ -13,6 +13,7 @@
 #include <iomanip>
 
 int dry_flag = 0;
+int filter_total_flag = 0;
 
 const option long_options[] =
     {
@@ -25,7 +26,8 @@ const option long_options[] =
         {"tau",     required_argument, nullptr,   't'},
         {"mu",      required_argument, nullptr,   'm'},
         {"max_dep", required_argument, nullptr,   'd'},
-        {"dry",     no_argument,       &dry_flag, 1},
+        {"filter-total", no_argument,   &filter_total_flag, 1},
+        {"dry",     no_argument,       &dry_flag,  1},
         {nullptr,   no_argument,       nullptr,   0}
     };
 
@@ -43,8 +45,9 @@ void print_help() {
               "-v, --vcf <VCF>        tumor samples' somatic VCF result\n"
               "-t, --tau <TAU>        optional threshold for somatic score, default is 0\n"
               "-m, --mu <MU>          1 - 5x10^(-m), default is 1-5e-6\n"
-              "-d, --max_dep <depth>  max depth of the dataset\n, (500)\n"
-              "--dry                  dry run flag\n";
+              "-d, --max_dep <depth>  max depth of the dataset, (500)\n"
+              "--dry                  dry run flag (off)\n"
+              "--filter-total          set to filter variants with total tumor depth < 150";
     exit(1);
 }
 
@@ -224,7 +227,7 @@ int main(int argc, char **argv) {
     std::cout << "## Chrom\tPos \t Prob \t Alt \t Genotype:TumorCount:Coverage" << std::endl;
     moss::Annotation anno(num_samples);
     start = std::chrono::system_clock::now();
-    moss::VcfWriter writer{out_vcf, loci, num_tumor_samples, ref_file, bam_files};
+    moss::VcfWriter writer{out_vcf, loci, num_tumor_samples, ref_file, bam_files, filter_total_flag};
     end = std::chrono::system_clock::now();
     elapsed_seconds = end - start;
     std::cout << "Writer elapsed time: " << elapsed_seconds.count() << std::endl;
@@ -248,8 +251,8 @@ int main(int argc, char **argv) {
                 end = std::chrono::system_clock::now();
                 calling_time += end - start;
 
-                writer.write_record(chrom.first, l, col.get_ref(), tumor, -10 * log_proba_non_soma,
-                                    anno.cnt_read, anno.cnt_tumor, anno.zq, anno.genotype, -10 * tau, num_samples);
+                writer.write_record(chrom.first, l, col.get_ref(), tumor, -10 * log_proba_non_soma, anno, -10 * tau,
+                                    num_samples);
 
                 if (log_proba_non_soma < tau) {
                     std::string states(std::bitset<sizeof(Z)>(Z).to_string());
@@ -267,6 +270,7 @@ int main(int argc, char **argv) {
         }
     }
     std::cout << "Calling elapsed time: " << calling_time.count() << std::endl;
+    now = std::time(nullptr);
     std::cout << "End time: " << std::put_time(std::localtime(&now), "%FT%T%z") << std::endl;
     return 0;
 }

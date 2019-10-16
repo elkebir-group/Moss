@@ -145,7 +145,8 @@ bool VcfReader::empty() {
 }
 
 VcfWriter::VcfWriter(const std::string &filename, MapContigLoci loci, unsigned long num_tumor_samples,
-                     std::string ref_file, std::vector<std::string> bam_files) {
+                     std::string ref_file, std::vector<std::string> bam_files, bool filter_total_dp)
+    : is_filter_total_dp(filter_total_dp) {
     ofile = bcf_open(filename.c_str(), "w");
     header = bcf_hdr_init("w");
     // FILTER
@@ -153,6 +154,12 @@ VcfWriter::VcfWriter(const std::string &filename, MapContigLoci loci, unsigned l
     bcf_hdr_append(header, "##FILTER=<ID=LOW_QUAL,Description=\"QUAL is below the threshold\">");
     bcf_hdr_append(header,
                    "##FILTER=<ID=LOW_NORMAL_DP,Description=\"The read depth of normal sample is less than 6\">");
+    bcf_hdr_append(header, "##FILTER=<ID=LOW_TUMOR_SUPP,Description=\"Less than 4 reads support any tumor sample\">");
+    if (is_filter_total_dp) {
+        bcf_hdr_append(header, "##FILTER=<ID=LOW_TOTAL_DP,Description=\"Total depth of 23 samples < 150\">");
+        filter_total_dp_id = bcf_hdr_id2int(header, BCF_DT_ID, "LOW_TOTAL_DP");
+    }
+    bcf_hdr_append(header, "##FILTER=<ID=LOW_VAF,Description=\"VAF in any tumor samples < 0.1\">");
     // FORMAT
     bcf_hdr_append(header,
                    "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read depth at this position for this sample\">");
@@ -209,6 +216,8 @@ VcfWriter::VcfWriter(const std::string &filename, MapContigLoci loci, unsigned l
     filter_pass_id = bcf_hdr_id2int(header, BCF_DT_ID, "PASS");
     filter_low_id = bcf_hdr_id2int(header, BCF_DT_ID, "LOW_QUAL");
     filter_low_normal_id = bcf_hdr_id2int(header, BCF_DT_ID, "LOW_NORMAL_DP");
+    filter_tumor_supp_id = bcf_hdr_id2int(header, BCF_DT_ID, "LOW_TUMOR_SUPP");
+    filter_vaf_id = bcf_hdr_id2int(header, BCF_DT_ID, "LOW_VAF");
     rec = bcf_init();
 }
 
@@ -222,16 +231,19 @@ VcfWriter::~VcfWriter() {
 }
 
 void
-VcfWriter::write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, float qual, std::vector<int> depth,
-                        std::vector<int> tumor_count, std::vector<float> zq, std::vector<int> Z,
+VcfWriter::write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, float qual, Annotation annos,
                         float thr, int num_samples) {
+    auto &depth = annos.cnt_read;
+    auto &tumor_count = annos.cnt_tumor;
+    auto &zq = annos.zq;
+    auto &Z = annos.genotype;
     bcf_update_filter(header, rec, nullptr, 0);
     rec->qual = qual;
     rec->pos = pos;
     rec->rid = bcf_hdr_name2id(header, chrom.c_str());
     std::string alleles{seq_nt16_str[ref]};
     alleles += ",";
-    alleles += seq_nt16_str[alt];
+    alleles += alt == 0 ? '.' : seq_nt16_str[alt];
     bcf_update_alleles_str(header, rec, alleles.c_str());
     bcf_update_format_int32(header, rec, "DP", depth.data(), num_samples);
     bcf_update_format_int32(header, rec, "TCOUNT", tumor_count.data(), num_samples);
@@ -244,6 +256,40 @@ VcfWriter::write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, fl
     }
     if (qual <= thr) {
         bcf_add_filter(header, rec, filter_low_id);
+        all_clear = false;
+    }
+    int total_cnt = 0;
+    double max_vaf = 0;
+    int max_supp = 0;
+    for (int i = 1; i < num_samples; i++) {
+        total_cnt += depth[i];
+        if (Z[i] == 1) {
+            double vaf;
+            if (depth[i] != 0) {
+                vaf = double(tumor_count[i]) / double(depth[i]);
+            } else {
+                vaf = 0;
+            }
+            if (vaf > max_vaf) {
+                max_vaf = vaf;
+            }
+            if (tumor_count[i] > max_supp) {
+                max_supp = tumor_count[i];
+            }
+        }
+    }
+    if (max_supp < 4) {
+        bcf_add_filter(header, rec, filter_tumor_supp_id);
+        all_clear = false;
+    }
+    if (is_filter_total_dp) {    
+        if (total_cnt < 150) {
+            bcf_add_filter(header, rec, filter_total_dp_id);
+            all_clear = false;
+        }
+    }
+    if (max_vaf < 0.1) {
+        bcf_add_filter(header, rec, filter_vaf_id);
         all_clear = false;
     }
     if (all_clear) {

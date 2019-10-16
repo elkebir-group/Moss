@@ -144,6 +144,7 @@ SnvCaller::calc_likelihood(const std::vector<std::vector<Read>> &aligned, BaseSe
 double
 SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, BaseSet &normal_gt, uint8_t &tumor_gt,
                    unsigned long &Z, Annotation &annos) {
+    tumor_gt = uint8_t(IUPAC_nuc::EQ);
     const std::vector<std::vector<Read>> &columns = pile.get_read_columns();
     uint8_t ref = pile.get_ref();
     if (normal_result.empty()) {
@@ -165,6 +166,14 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
         annos.cnt_read[i] = columns[i].size();
     }
     if (n_valid_tumor_sample == 0) {
+        Z = 0;
+        for (int i = 0; i < n_tumor_sample + 1; i++)
+        {
+            tumor_gt = uint8_t(IUPAC_nuc::EQ);
+            annos.cnt_tumor[i] = 0;
+            annos.genotype[i] = 0;
+            annos.zq[i] = 0;
+        }
         return 0;
     }
 

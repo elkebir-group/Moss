@@ -54,13 +54,15 @@ namespace moss {
         std::vector<std::deque<locus_t>> actives;           //!< active loci for each sample
         std::vector<Buffer> buffers;                        //!< buffer for Pileups in building
         const static uint16_t FAIL_FLAGS = BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP;
+        bool is_filter_edit_distance;
 
     public:
         explicit BamStreamer(std::string ref_file_name,
                              const std::vector<std::string> &bam_file_names,
                              const MapContigLoci &loci,
                              int min_baseQ = 13,
-                             int min_mapQ = 30);
+                             int min_mapQ = 30,
+                             bool filter_edit_distance = false);
 
         virtual ~BamStreamer();
 
