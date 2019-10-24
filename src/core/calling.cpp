@@ -32,12 +32,12 @@ SnvCaller::SnvCaller(int n_tumor_sample, const std::string& normal, double mu, i
     logPriorZComplement = new double[n_tumor_sample];
     logAll0 = new double[n_tumor_sample];
     for (int idx = 0; idx < n_tumor_sample; idx++) {
-        logPriorZComplement[idx] = logNoisePriorComplement - log((1 << (idx + 1)) - 1);
+        logPriorZComplement[idx] = logNoisePriorComplement - log((1ULL << (idx + 1)) - 1);
         // log(1 - \mu * 2^m / (2^m - 1)) = log(2^m - 1 - 2^m(1-MU)) - log(2^m - 1)
         if (idx == 0) {
-            logAll0[idx] = log1p(mu * (1 << (idx + 1)) - 2) - log1p((1 << (idx + 1)) - 2);
+            logAll0[idx] = log1p(mu * (1ULL << (idx + 1)) - 2) - log1p((1ULL << (idx + 1)) - 2);
         } else {
-            logAll0[idx] = log(mu * (1 << (idx + 1)) - 1) - log((1 << (idx + 1)) - 1);
+            logAll0[idx] = log(mu * (1ULL << (idx + 1)) - 1) - log((1ULL << (idx + 1)) - 1);
         }
     }
     logUniform = -log(gridSize);
@@ -167,13 +167,13 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
     }
     if (n_valid_tumor_sample == 0) {
         Z = 0;
-        for (int i = 0; i < n_tumor_sample + 1; i++)
-        {
-            tumor_gt = uint8_t(IUPAC_nuc::EQ);
+        tumor_gt = uint8_t(IUPAC_nuc::EQ);
+        for (int i = 0; i < n_tumor_sample + 1; i++) {
             annos.cnt_tumor[i] = 0;
             annos.genotype[i] = 0;
             annos.zq[i] = 0;
         }
+        std::fill(annos.cnt_type_strand.begin(), annos.cnt_type_strand.end(), 0);
         return 0;
     }
 
@@ -232,15 +232,33 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
         }
     }
     annos.cnt_tumor[0] = normal_tumor_allele_count;
+    std::fill(annos.cnt_type_strand.begin(), annos.cnt_type_strand.end(), 0);
     for (int i = 0; i < n_tumor_sample; ++i) {
         if (!is_empty[i] && (likelihoods[i][tumor_gt_idx][0] < llh_integral[i][tumor_gt_idx])) {
-            Z |= (1 << i);
+            Z |= (1ULL << i);
             annos.genotype[i + 1] = 1;
         } else {
             annos.genotype[i + 1] = 0;
         }
         annos.cnt_tumor[i + 1] = n_tumor[i * tumor_bases.size() + tumor_gt_idx];
         annos.zq[i + 1] = -10 * llh_integral[i][tumor_gt_idx];
+    }
+    for (int i = 0; i < n_tumor_sample + 1; ++i) {
+        for (auto &read : columns[i]) {
+            if (normal_gt.contain(read.base)) {
+                if (!read.is_reverse_strand) {
+                    annos.cnt_type_strand[i*4] += 1;        // ref forward
+                } else {
+                    annos.cnt_type_strand[i*4 + 1] += 1;    // ref reverse
+                }
+            } else if (tumor_bases.contain(read.base)) {
+                if (read.is_reverse_strand) {
+                    annos.cnt_type_strand[i*4 + 2] += 1;    // alt forward
+                } else {
+                    annos.cnt_type_strand[i*4 + 3] += 1;    // alt reverse
+                }
+            }
+        }
     }
 
     double log_prob_non_soma = log_sum_exp_final(max_nume_elem, nume) - log_sum_exp_final(max_deno_elem, deno);

@@ -97,6 +97,7 @@ namespace moss {
     typedef struct {
         uint8_t base;
         int qual;
+        bool is_reverse_strand;
     } Read;
 
     class Pileups {
@@ -119,10 +120,11 @@ namespace moss {
         std::vector<int> genotype;
         std::vector<int> cnt_read;
         std::vector<int> cnt_tumor;
+        std::vector<int> cnt_type_strand;
         std::vector<float> zq;
 
         _Annotation(int num_samples) : genotype(num_samples, 0), cnt_read(num_samples, 0), cnt_tumor(num_samples, 0),
-                                       zq(num_samples, 0) {}
+                                       zq(num_samples, 0), cnt_type_strand(num_samples * 4, 0) {}
     } Annotation;
 
 }

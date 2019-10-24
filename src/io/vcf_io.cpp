@@ -10,6 +10,7 @@
 #include <htslib/sam.h>
 #include <iomanip>
 #include <ctime>
+#include <cmath>
 #include "vcf_io.h"
 
 using namespace moss;
@@ -169,6 +170,11 @@ VcfWriter::VcfWriter(const std::string &filename, MapContigLoci loci, unsigned l
                    "##FORMAT=<ID=Z,Number=1,Type=Integer,Description=\"Boolean indicator of containing somatic SNV in this sample \">");
     bcf_hdr_append(header,
                    "##FORMAT=<ID=ZQ,Number=1,Type=Float,Description=\"Sample-specific likelihood of boolean indicator to be true (phred-scaled)\">");
+    bcf_hdr_append(header,
+                   "##FORMAT=<ID=SOR,Number=1,Type=Float,Description=\"Symmetric Odds Ratio of 2x2 contingency table to detect strand bias\">");
+    bcf_hdr_append(header,
+                   "##FORMAT=<ID=SB,Number=4,Type=Integer,Description=\"Per-sample component statistics which comprise"
+                   "the Fisher's Exact Test to detect strand bias.\">");
     ref_idx = fai_load(ref_file.c_str());
     for (const auto &contig : loci) {
         int len = faidx_seq_len(ref_idx, contig.first.c_str());
@@ -249,6 +255,17 @@ VcfWriter::write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, fl
     bcf_update_format_int32(header, rec, "TCOUNT", tumor_count.data(), num_samples);
     bcf_update_format_int32(header, rec, "Z", Z.data(), num_samples);
     bcf_update_format_float(header, rec, "ZQ", zq.data(), num_samples);
+    std::vector<float> SOR(num_samples);
+    for (int i = 0; i < num_samples; i++) {
+        float a = annos.cnt_type_strand[4*i] + 1;
+        float b = annos.cnt_type_strand[4*i + 1] + 1;
+        float c = annos.cnt_type_strand[4*i + 2] + 1;
+        float d = annos.cnt_type_strand[4*i + 3] + 1;
+        SOR[i] = std::log(((a * d) / (b * c) + (b * c) / (a * d))
+                 * std::min(a, b) * std::max(c, d) / std::min(c, d) / std::max(a, b));
+    }
+    bcf_update_format_float(header, rec, "SOR", SOR.data(), num_samples);
+    bcf_update_format_int32(header, rec, "SB", annos.cnt_type_strand.data(), num_samples * 4);
     bool all_clear = true;
     if (depth[0] < 6) {
         bcf_add_filter(header, rec, filter_low_normal_id);
