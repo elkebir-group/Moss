@@ -175,6 +175,9 @@ VcfWriter::VcfWriter(const std::string &filename, MapContigLoci loci, unsigned l
     bcf_hdr_append(header,
                    "##FORMAT=<ID=SB,Number=4,Type=Integer,Description=\"Per-sample component statistics which comprise"
                    "the Fisher's Exact Test to detect strand bias.\">");
+    // INFO
+    bcf_hdr_append(header,
+                   "##INFO=<ID=TIN,Number=1,Type=Float,Description=\"Probability of normal also has tumor genotype\">");
     ref_idx = fai_load(ref_file.c_str());
     for (const auto &contig : loci) {
         int len = faidx_seq_len(ref_idx, contig.first.c_str());
@@ -255,6 +258,7 @@ VcfWriter::write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, fl
     bcf_update_format_int32(header, rec, "TCOUNT", tumor_count.data(), num_samples);
     bcf_update_format_int32(header, rec, "Z", Z.data(), num_samples);
     bcf_update_format_float(header, rec, "ZQ", zq.data(), num_samples);
+    bcf_update_info_float(header, rec, "TIN", &annos.log_t_in_normal, 1);
     std::vector<float> SOR(num_samples);
     for (int i = 0; i < num_samples; i++) {
         float a = annos.cnt_type_strand[4*i] + 1;

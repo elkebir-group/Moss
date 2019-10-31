@@ -25,6 +25,10 @@ SnvCaller::SnvCaller(int n_tumor_sample, const std::string& normal, double mu, i
       p_err(n_tumor_sample, std::vector<double>(max_depth)),
       is_normal(n_tumor_sample, std::vector<char>(max_depth)),
       is_tumor(n_tumor_sample, std::vector<char>(max_depth * 3)),
+      p_err_normal(max_depth),
+      is_normal_normal(max_depth),
+      is_tumor_normal(max_depth),
+      likelihoods_normal(grid_size),
       likelihoods(n_tumor_sample, std::vector<std::vector<double>>(3, std::vector<double>(grid_size))) {
     stepSize = 1.0 / (gridSize - 1);
     logMu = log1p(mu - 1);
@@ -91,6 +95,9 @@ SnvCaller::calc_likelihood(const std::vector<std::vector<Read>> &aligned, BaseSe
                     is_normal[i].resize(max_depth);
                     is_tumor[i].resize(max_depth * 3);
                 }
+                p_err_normal.resize(max_depth);
+                is_normal_normal.resize(max_depth);
+                is_tumor_normal.resize(max_depth);
             }
             p_err[idx_sample].at(idx_read) = qphred2prob(r->qual);
             is_normal[idx_sample].at(idx_read) = normal_bases.contain(r->base);
@@ -139,6 +146,58 @@ SnvCaller::calc_likelihood(const std::vector<std::vector<Read>> &aligned, BaseSe
         }
         ++idx_sample;
     }
+}
+
+double SnvCaller::in_normal(const Pileups &pile, BaseSet &normal_gt, const uint8_t &tumor_gt) {
+    const std::vector<std::vector<Read>> &columns = pile.get_read_columns();
+    auto aligned = columns[0];
+    double log_in_normal{};
+    // pre-calculate
+    int n_normal = 0,
+        n_tumor = 0;
+    int idx_read = 0;
+    for (auto r = aligned.begin(); r != aligned.end(); ++r, ++idx_read) {
+        if (idx_read >= max_depth) {
+            max_depth *= 2;
+            p_err_normal.resize(max_depth);
+            is_normal_normal.resize(max_depth);
+            is_tumor_normal.resize(max_depth);
+        }
+        p_err_normal.at(idx_read) = qphred2prob(r->qual);
+        is_normal_normal.at(idx_read) = normal_gt.contain(r->base);
+        n_normal += is_normal_normal[idx_read] ? 1 : 0;
+
+        bool eq = r->base == tumor_gt;
+        is_tumor_normal.at(idx_read) = eq;
+        n_tumor += eq ? 1 : 0;
+    }
+    for (int idx_step = 0; idx_step < gridSize; ++idx_step) {
+        double lhood = 0;
+        double f = idx_step * stepSize;
+        unsigned long sample_size = aligned.size();
+        assert(sample_size < max_depth);
+        for (int j = 0; j < sample_size; ++j) {
+            if (is_normal_normal[j]) {
+                lhood += log(f * p_err_normal[j] / 3 +
+                                (1 - f) * (1 + p_err_normal[j] * (double(normal_gt.size()) - 4.0) / 3));
+                assert(lhood <= 0);
+            } else if (is_tumor_normal[j]) {
+                lhood += log(f * (1 - p_err_normal[j]) + (1 - f) * p_err_normal[j] / 3);
+                assert(lhood <= 0);
+            } else {
+                // f * err / 3 + (1-f) * err / 3
+                lhood += log(p_err_normal[j]) - log(3);
+                assert(lhood <= 0);
+            }
+        }
+        double coeff = log_trinomial(sample_size - n_normal - n_tumor, n_normal, n_tumor);
+        assert(!std::isinf(coeff));
+        likelihoods_normal[idx_step] = lhood + coeff;
+    }
+    double llh_integral{};
+    llh_integral = log_sum_exp(likelihoods_normal) + logUniform;
+    log_in_normal = (likelihoods_normal[0] + logMu) - (log_sum_exp(llh_integral + logNoisePriorComplement, likelihoods_normal[0] + logMu));
+    return log_in_normal;
 }
 
 double
@@ -223,7 +282,8 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
         idx_nuc++;
     }
 
-    Z = 0;
+    annos.log_t_in_normal = -10 * in_normal(pile, normal_gt, tumor_gt);
+
     annos.genotype[0] = 0;
     int normal_tumor_allele_count = 0;
     for (auto &item : columns[0]) {
@@ -235,7 +295,6 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
     std::fill(annos.cnt_type_strand.begin(), annos.cnt_type_strand.end(), 0);
     for (int i = 0; i < n_tumor_sample; ++i) {
         if (!is_empty[i] && (likelihoods[i][tumor_gt_idx][0] < llh_integral[i][tumor_gt_idx])) {
-            Z |= (1ULL << i);
             annos.genotype[i + 1] = 1;
         } else {
             annos.genotype[i + 1] = 0;

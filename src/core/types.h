@@ -122,6 +122,7 @@ namespace moss {
         std::vector<int> cnt_tumor;
         std::vector<int> cnt_type_strand;
         std::vector<float> zq;
+        float log_t_in_normal;
 
         _Annotation(int num_samples) : genotype(num_samples, 0), cnt_read(num_samples, 0), cnt_tumor(num_samples, 0),
                                        zq(num_samples, 0), cnt_type_strand(num_samples * 4, 0) {}

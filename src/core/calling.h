@@ -74,12 +74,16 @@ namespace moss {
         std::vector<bool> is_empty;
         std::vector<int> n_tumor;   //* count of tumor allels in samples: n_tumor_sample x n_tumor_bases
         std::vector<int> n_normal;  //* count of normal allels in samples: n_tumor_sample
+        std::vector<double> p_err_normal;
+        std::vector<int> is_normal_normal;
+        std::vector<int> is_tumor_normal;
+        std::vector<double> likelihoods_normal;
 
         BaseSet normal_calling(const std::vector<Read> &column, uint8_t ref);
 
         BaseSet normal_calling(const std::string &contig, locus_t pos, uint8_t ref);
 
-        Array3D likelihoods;
+        Array3D likelihoods;        //* n_tumor_sample x n_tumor_base x gridSize
 
         /*!
          * Calculate log likelihood of each samples given tumor base and VAF,
@@ -90,6 +94,7 @@ namespace moss {
          * @param tumor_base : return MLE tumor base
          */
         void calc_likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet normal_bases, BaseSet tumor_base);
+        double in_normal(const Pileups &pile, BaseSet &normal_gt, const uint8_t &tumor_gt);
 
     public:
 
