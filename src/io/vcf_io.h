@@ -56,6 +56,7 @@ namespace moss {
         int filter_tumor_supp_id;
         int filter_total_dp_id;
         int filter_vaf_id;
+        int filter_strand_id;
         bool is_filter_total_dp;
 
     public:

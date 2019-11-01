@@ -161,6 +161,7 @@ VcfWriter::VcfWriter(const std::string &filename, MapContigLoci loci, unsigned l
         filter_total_dp_id = bcf_hdr_id2int(header, BCF_DT_ID, "LOW_TOTAL_DP");
     }
     bcf_hdr_append(header, "##FILTER=<ID=LOW_VAF,Description=\"VAF in any tumor samples < 0.1\">");
+    bcf_hdr_append(header, "##FILTER=<ID=EMPTY_STRAND,Description=\"Total somatic allele count is 0 on one strand\">");
     // FORMAT
     bcf_hdr_append(header,
                    "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read depth at this position for this sample\">");
@@ -227,6 +228,7 @@ VcfWriter::VcfWriter(const std::string &filename, MapContigLoci loci, unsigned l
     filter_low_normal_id = bcf_hdr_id2int(header, BCF_DT_ID, "LOW_NORMAL_DP");
     filter_tumor_supp_id = bcf_hdr_id2int(header, BCF_DT_ID, "LOW_TUMOR_SUPP");
     filter_vaf_id = bcf_hdr_id2int(header, BCF_DT_ID, "LOW_VAF");
+    filter_strand_id = bcf_hdr_id2int(header, BCF_DT_ID, "EMPTY_STRAND");
     rec = bcf_init();
 }
 
@@ -282,6 +284,8 @@ VcfWriter::write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, fl
     int total_cnt = 0;
     double max_vaf = 0;
     int max_supp = 0;
+    int forward_somatic_cnt = 0;
+    int reverse_somatic_cnt = 0;
     for (int i = 1; i < num_samples; i++) {
         total_cnt += depth[i];
         if (Z[i] == 1) {
@@ -298,6 +302,8 @@ VcfWriter::write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, fl
                 max_supp = tumor_count[i];
             }
         }
+        forward_somatic_cnt += annos.cnt_type_strand[4*i + 2];
+        reverse_somatic_cnt += annos.cnt_type_strand[4*i + 3];
     }
     if (max_supp < 4) {
         bcf_add_filter(header, rec, filter_tumor_supp_id);
@@ -311,6 +317,10 @@ VcfWriter::write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, fl
     }
     if (max_vaf < 0.1) {
         bcf_add_filter(header, rec, filter_vaf_id);
+        all_clear = false;
+    }
+    if (forward_somatic_cnt == 0 || reverse_somatic_cnt == 0) {
+        bcf_add_filter(header, rec, filter_strand_id);
         all_clear = false;
     }
     if (all_clear) {
