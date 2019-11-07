@@ -11,6 +11,7 @@
 #include <iomanip>
 #include <ctime>
 #include <cmath>
+#include <algorithm>
 #include "vcf_io.h"
 
 using namespace moss;
@@ -146,22 +147,24 @@ bool VcfReader::empty() {
 }
 
 VcfWriter::VcfWriter(const std::string &filename, MapContigLoci loci, unsigned long num_tumor_samples,
-                     std::string ref_file, std::vector<std::string> bam_files, bool filter_total_dp)
-    : is_filter_total_dp(filter_total_dp) {
+                     std::string ref_file, std::vector<std::string> bam_files, bool filter_total_dp, bool filter_vaf, float qual_thr)
+    : is_filter_total_dp(filter_total_dp), qual_thr(qual_thr) {
     ofile = bcf_open(filename.c_str(), "w");
     header = bcf_hdr_init("w");
     // FILTER
-    bcf_hdr_append(header, "##FILTER=<ID=PASS,Description=\"All filters passed\">");
-    bcf_hdr_append(header, "##FILTER=<ID=LOW_QUAL,Description=\"QUAL is below the threshold\">");
-    bcf_hdr_append(header,
-                   "##FILTER=<ID=LOW_NORMAL_DP,Description=\"The read depth of normal sample is less than 6\">");
-    bcf_hdr_append(header, "##FILTER=<ID=LOW_TUMOR_SUPP,Description=\"Less than 4 reads support any tumor sample\">");
-    if (is_filter_total_dp) {
-        bcf_hdr_append(header, "##FILTER=<ID=LOW_TOTAL_DP,Description=\"Total depth of 23 samples < 150\">");
-        filter_total_dp_id = bcf_hdr_id2int(header, BCF_DT_ID, "LOW_TOTAL_DP");
-    }
-    bcf_hdr_append(header, "##FILTER=<ID=LOW_VAF,Description=\"VAF in any tumor samples < 0.1\">");
-    bcf_hdr_append(header, "##FILTER=<ID=EMPTY_STRAND,Description=\"Total somatic allele count is 0 on one strand\">");
+    addFilters()
+    (true, filter_low_normal_depth,
+        "##FILTER=<ID=LOW_NORMAL_DP,Description=\"The read depth of normal sample is less than 6\">")
+    (true, filter_low_qual, qual_thr,
+        "##FILTER=<ID=LOW_QUAL,Description=\"QUAL is below the threshold\">")
+    (true, filter_low_tumor_support,
+        "##FILTER=<ID=LOW_TUMOR_SUPP,Description=\"Less than 4 reads support any tumor sample\">")
+    (is_filter_total_dp, filter_low_total_depth,
+        "##FILTER=<ID=LOW_TOTAL_DP,Description=\"Total depth of 23 samples < 150\">")
+    (is_filter_vaf, filter_low_vaf,
+        "##FILTER=<ID=LOW_VAF,Description=\"VAF in any tumor samples < 0.1\">")
+    (true, filter_empty_strand,
+        "##FILTER=<ID=EMPTY_STRAND,Description=\"Total somatic allele count is 0 on one strand\">");
     // FORMAT
     bcf_hdr_append(header,
                    "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read depth at this position for this sample\">");
@@ -223,12 +226,6 @@ VcfWriter::VcfWriter(const std::string &filename, MapContigLoci loci, unsigned l
         ++i;
     }
     bcf_hdr_write(ofile, header);
-    filter_pass_id = bcf_hdr_id2int(header, BCF_DT_ID, "PASS");
-    filter_low_id = bcf_hdr_id2int(header, BCF_DT_ID, "LOW_QUAL");
-    filter_low_normal_id = bcf_hdr_id2int(header, BCF_DT_ID, "LOW_NORMAL_DP");
-    filter_tumor_supp_id = bcf_hdr_id2int(header, BCF_DT_ID, "LOW_TUMOR_SUPP");
-    filter_vaf_id = bcf_hdr_id2int(header, BCF_DT_ID, "LOW_VAF");
-    filter_strand_id = bcf_hdr_id2int(header, BCF_DT_ID, "EMPTY_STRAND");
     rec = bcf_init();
 }
 
@@ -241,17 +238,65 @@ VcfWriter::~VcfWriter() {
     bcf_destroy(rec);
 }
 
+bool VcfWriter::filter_low_qual(Annotation &anno, float thr) {
+    return anno.quality <= thr;     // not multiplied by -10 yet
+}
+
+bool VcfWriter::filter_low_normal_depth(Annotation &anno) {
+    return anno.cnt_read[0] >= LEAST_NORMAL_DEPTH;
+}
+
+bool VcfWriter::filter_low_tumor_support(Annotation &anno) {
+    auto max_supp = std::max_element(anno.cnt_tumor.cbegin() + 1, anno.cnt_tumor.cend());
+    return *max_supp >= LEAST_TUMOR_SUPPORT;
+}
+
+bool VcfWriter::filter_low_total_depth(Annotation &anno) {
+    int total_depth = 0;
+    for (int i = 1; i < anno.cnt_read.size(); i++) {
+        total_depth += anno.cnt_read[i];
+    }
+    return total_depth >= LEAST_TOTAL_DEPTH;
+}
+
+bool VcfWriter::filter_low_vaf(Annotation &anno) {
+    double max_vaf = 0;
+    double vaf;
+    for (int i = 1; i < anno.cnt_read.size(); i++) {
+        if (anno.genotype[i] == 1) {
+            if (anno.cnt_read[i] != 0) {
+                vaf = double(anno.cnt_tumor[i]) / double(anno.cnt_read[i]);
+            } else {
+                vaf = 0;
+            }
+            if (vaf > max_vaf)
+                max_vaf = vaf;
+        }
+    }
+    return max_vaf >= LEAST_VAF;
+}
+
+bool VcfWriter::filter_empty_strand(Annotation &anno) {
+    int forward_somatic_cnt = 0;
+    int reverse_somatic_cnt = 0;
+    for (int i = 1; i < anno.cnt_read.size(); i++) {
+        forward_somatic_cnt += anno.cnt_type_strand[4*i + 2];
+        reverse_somatic_cnt += anno.cnt_type_strand[4*i + 3];
+    }
+    return (forward_somatic_cnt != 0 && reverse_somatic_cnt != 0);
+}
+
 void
-VcfWriter::write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, float qual, Annotation annos,
-                        float thr, int num_samples) {
+VcfWriter::write_record(std::string chrom, int pos, uint8_t ref, Annotation &annos, int num_samples) {
     auto &depth = annos.cnt_read;
     auto &tumor_count = annos.cnt_tumor;
     auto &zq = annos.zq;
     auto &Z = annos.genotype;
     bcf_update_filter(header, rec, nullptr, 0);
-    rec->qual = qual;
+    rec->qual = -10 * annos.quality;
     rec->pos = pos;
     rec->rid = bcf_hdr_name2id(header, chrom.c_str());
+    uint8_t alt = annos.tumor_gt;
     std::string alleles{seq_nt16_str[ref]};
     alleles += ",";
     alleles += alt == 0 ? '.' : seq_nt16_str[alt];
@@ -273,59 +318,23 @@ VcfWriter::write_record(std::string chrom, int pos, uint8_t ref, uint8_t alt, fl
     bcf_update_format_float(header, rec, "SOR", SOR.data(), num_samples);
     bcf_update_format_int32(header, rec, "SB", annos.cnt_type_strand.data(), num_samples * 4);
     bool all_clear = true;
-    if (depth[0] < 6) {
-        bcf_add_filter(header, rec, filter_low_normal_id);
-        all_clear = false;
-    }
-    if (qual <= thr) {
-        bcf_add_filter(header, rec, filter_low_id);
-        all_clear = false;
-    }
-    int total_cnt = 0;
-    double max_vaf = 0;
-    int max_supp = 0;
-    int forward_somatic_cnt = 0;
-    int reverse_somatic_cnt = 0;
-    for (int i = 1; i < num_samples; i++) {
-        total_cnt += depth[i];
-        if (Z[i] == 1) {
-            double vaf;
-            if (depth[i] != 0) {
-                vaf = double(tumor_count[i]) / double(depth[i]);
-            } else {
-                vaf = 0;
-            }
-            if (vaf > max_vaf) {
-                max_vaf = vaf;
-            }
-            if (tumor_count[i] > max_supp) {
-                max_supp = tumor_count[i];
-            }
-        }
-        forward_somatic_cnt += annos.cnt_type_strand[4*i + 2];
-        reverse_somatic_cnt += annos.cnt_type_strand[4*i + 3];
-    }
-    if (max_supp < 4) {
-        bcf_add_filter(header, rec, filter_tumor_supp_id);
-        all_clear = false;
-    }
-    if (is_filter_total_dp) {    
-        if (total_cnt < 150) {
-            bcf_add_filter(header, rec, filter_total_dp_id);
+    
+    for (auto &&filter : filters) {
+        if (!(filter.is_filter(annos))) {
             all_clear = false;
+            bcf_add_filter(header, rec, filter.filter_id);
         }
-    }
-    if (max_vaf < 0.1) {
-        bcf_add_filter(header, rec, filter_vaf_id);
-        all_clear = false;
-    }
-    if (forward_somatic_cnt == 0 || reverse_somatic_cnt == 0) {
-        bcf_add_filter(header, rec, filter_strand_id);
-        all_clear = false;
     }
     if (all_clear) {
         bcf_add_filter(header, rec, filter_pass_id);
     }
+    
     bcf_write(ofile, header, rec);
     bcf_clear(rec);
+}
+
+FilterHelper VcfWriter::addFilters() {
+    bcf_hdr_append(header, "##FILTER=<ID=PASS,Description=\"All filters passed\">");
+    filter_pass_id = bcf_hdr_id2int(header, BCF_DT_ID, "PASS");
+    return FilterHelper(*this);
 }

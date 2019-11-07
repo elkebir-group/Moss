@@ -117,6 +117,9 @@ namespace moss {
     };
 
     typedef struct _Annotation {
+        float quality;
+        BaseSet normal_gt;
+        uint8_t tumor_gt;
         std::vector<int> genotype;
         std::vector<int> cnt_read;
         std::vector<int> cnt_tumor;
@@ -126,6 +129,17 @@ namespace moss {
 
         _Annotation(int num_samples) : genotype(num_samples, 0), cnt_read(num_samples, 0), cnt_tumor(num_samples, 0),
                                        zq(num_samples, 0), cnt_type_strand(num_samples * 4, 0) {}
+
+        _Annotation(int num_samples, BaseSet normal_gt, float quality, uint8_t tumor_gt, float log_t_in_normal)
+            : genotype(num_samples, 0),
+              cnt_read(num_samples, 0),
+              cnt_tumor(num_samples, 0),
+              zq(num_samples, 0),
+              cnt_type_strand(num_samples * 4, 0),
+              quality(quality),
+              normal_gt(normal_gt),
+              tumor_gt(tumor_gt),
+              log_t_in_normal(log_t_in_normal) {}
     } Annotation;
 
 }

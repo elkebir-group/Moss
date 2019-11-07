@@ -201,18 +201,17 @@ double SnvCaller::in_normal(const Pileups &pile, BaseSet &normal_gt, const uint8
 }
 
 double
-SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, BaseSet &normal_gt, uint8_t &tumor_gt,
-                   unsigned long &Z, Annotation &annos) {
-    tumor_gt = uint8_t(IUPAC_nuc::EQ);
+SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, unsigned long &Z, Annotation &annos) {
+    annos.tumor_gt = uint8_t(IUPAC_nuc::EQ);
     const std::vector<std::vector<Read>> &columns = pile.get_read_columns();
     uint8_t ref = pile.get_ref();
     if (normal_result.empty()) {
-        normal_gt = normal_calling(columns[0], ref);
+        annos.normal_gt = normal_calling(columns[0], ref);
     } else {
-        normal_gt = normal_calling(chrom, pos, ref);
+        annos.normal_gt = normal_calling(chrom, pos, ref);
     }
-    BaseSet tumor_bases = normal_gt.complement();
-    calc_likelihood(std::vector<std::vector<moss::Read>>(columns.begin() + 1, columns.end()), normal_gt, tumor_bases);
+    BaseSet tumor_bases = annos.normal_gt.complement();
+    calc_likelihood(std::vector<std::vector<moss::Read>>(columns.begin() + 1, columns.end()), annos.normal_gt, tumor_bases);
     size_t n_valid_tumor_sample = 0;
     annos.cnt_read[0] = columns[0].size();
     for (unsigned long i = 1; i < columns.size(); i++) {
@@ -226,7 +225,7 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
     }
     if (n_valid_tumor_sample == 0) {
         Z = 0;
-        tumor_gt = uint8_t(IUPAC_nuc::EQ);
+        annos.tumor_gt = uint8_t(IUPAC_nuc::EQ);
         for (int i = 0; i < n_tumor_sample + 1; i++) {
             annos.cnt_tumor[i] = 0;
             annos.genotype[i] = 0;
@@ -274,7 +273,7 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
             nume_gt + logAll0[n_valid_tumor_sample - 1]);
         if (max_tumor_evidence <= evidence) {
             max_tumor_evidence = evidence;
-            tumor_gt = tumor_base;
+            annos.tumor_gt = tumor_base;
             tumor_gt_idx = idx_nuc;
         }
         log_sum_exp_iter(max_nume_elem, nume, nume_gt + logMu);
@@ -282,12 +281,12 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
         idx_nuc++;
     }
 
-    annos.log_t_in_normal = -10 * in_normal(pile, normal_gt, tumor_gt);
+    annos.log_t_in_normal = -10 * in_normal(pile, annos.normal_gt, annos.tumor_gt);
 
     annos.genotype[0] = 0;
     int normal_tumor_allele_count = 0;
     for (auto &item : columns[0]) {
-        if (item.base == tumor_gt) {
+        if (item.base == annos.tumor_gt) {
             normal_tumor_allele_count++;
         }
     }
@@ -304,7 +303,7 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
     }
     for (int i = 0; i < n_tumor_sample + 1; ++i) {
         for (auto &read : columns[i]) {
-            if (normal_gt.contain(read.base)) {
+            if (annos.normal_gt.contain(read.base)) {
                 if (!read.is_reverse_strand) {
                     annos.cnt_type_strand[i*4] += 1;        // ref forward
                 } else {
@@ -320,8 +319,8 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, B
         }
     }
 
-    double log_prob_non_soma = log_sum_exp_final(max_nume_elem, nume) - log_sum_exp_final(max_deno_elem, deno);
-    return log_prob_non_soma;
+    annos.quality = log_sum_exp_final(max_nume_elem, nume) - log_sum_exp_final(max_deno_elem, deno);
+    return annos.quality;
 }
 
 double moss::qphred2prob(int qphred) {

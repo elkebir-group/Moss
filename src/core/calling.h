@@ -104,8 +104,7 @@ namespace moss {
         ~SnvCaller();
 
         double
-        calling(const std::string &chrom, locus_t pos, const Pileups &pile, BaseSet &normal_gt, uint8_t &tumor_gt,
-                unsigned long &Z, Annotation &anno);
+        calling(const std::string &chrom, locus_t pos, const Pileups &pile, unsigned long &Z, Annotation &anno);
     };
 }
 
