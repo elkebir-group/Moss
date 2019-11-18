@@ -98,7 +98,7 @@ namespace moss {
 
     public:
 
-        SnvCaller(int n_tumor_sample, const std::string& normal, double mu = 1.0 - 5e-6, int max_depth = 500,
+        SnvCaller(int n_tumor_sample, const std::string& normal, double mu = 1.0 - 5e-4, int max_depth = 500,
                   int grid_size = 21);
 
         ~SnvCaller();

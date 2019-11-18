@@ -35,22 +35,31 @@ const option long_options[] =
 
 void print_help() {
     std::cout <<
-              "\nMultiple Sample Somatic variant caller\n\n"
-              "-h, --help             show this help message and exit\n"
-              "-b, --bam <BAM>        a pair of original and realigned BAM files for\n"
-              "                       one sample, can be addressed multiple times to\n"
-              "                       specify\n"
-              "-r, --ref <FASTA>      reference FASTA file\n"
-              "-o, --output <OUT>     output VCF file\n"
-              "-n, --normal <NORMAL>  normal sample's germline VCF result\n"
-              "-l, --loci <LOCI>      candidate loci files, 0-based\n"
-              "-v, --vcf <VCF>        tumor samples' somatic VCF result\n"
-              "-t, --tau <TAU>        optional threshold for somatic score, default is 0\n"
-              "-m, --mu <MU>          1 - 5x10^(-m), default is 1-5e-6\n"
-              "-d, --max_dep <depth>  max depth of the dataset, (500)\n"
-              "--dry                  dry run flag (off)\n"
-              "--filter-total          set to filter variants with total tumor depth < 150";
-              "--filter-vaf            set to filter variants with VAF in any samples < 0.1";
+              "Multiple Sample Somatic variant caller\n"
+              "\n"
+              "Usage:\n"
+              "  moss [options] -r <reference> -b <normal BAM> -b <tumor BAM>\n"
+              "       -n <germline VCF> -v <candidate VCF> -o <output VCF>\n"
+              "\n"
+              "Compulsary arguments:\n"
+              "  -b, --bam <BAM>        a pair of original and realigned BAM files for\n"
+              "                         one sample, can be addressed multiple times\n"
+              "  -r, --ref <FASTA>      reference FASTA file\n"
+              "  -o, --output <OUT>     output VCF file\n"
+              "  -n, --normal <NORMAL>  normal sample's germline VCF result\n"
+              "  -v, --vcf <VCF>        tumor samples' somatic VCF result\n"
+              "  -l, --loci <LOCI>      candidate loci files, 0-based\n"
+              "\n"
+              "General options\n"
+              "  -h, --help             show this help message and exit\n"
+              "\n"
+              "Other options:\n"
+              "  -t, --tau <TAU>        optional threshold for somatic score, default is 0\n"
+              "  -m, --mu <MU>          set somatic mutation prior, 1-5x10^(-m), default is 1-5e-4\n"
+              "  -d, --max_dep <depth>  max depth of the dataset, default is 500\n"
+              "  --dry                  set to dry run\n"
+              "  --filter-total          set to filter variants with total tumor depth < 150\n"
+              "  --filter-vaf            set to filter variants with VAF in any samples < 0.1\n";
     exit(1);
 }
 
@@ -74,11 +83,14 @@ int main(int argc, char **argv) {
     std::vector<std::string> loci_files;
     std::vector<std::string> tumor_vcfs;
     float tau{0};
-    double mu{1 - 5e-6};
+    double mu{1 - 5e-4};
     int max_depth{500};
 
     /* getopt_long stores the option index here. */
     int option_index = 0;
+    if (argc == 1) {
+        print_help();
+    }
     while (true) {
         c = getopt_long(argc, argv, short_opts, long_options, &option_index);
         if (c == -1) {
