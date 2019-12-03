@@ -159,6 +159,11 @@ double SnvCaller::in_normal(const Pileups &pile, BaseSet &normal_gt, const uint8
     for (auto r = aligned.begin(); r != aligned.end(); ++r, ++idx_read) {
         if (idx_read >= max_depth) {
             max_depth *= 2;
+            for (int i = 0; i < n_tumor_sample; ++i) {
+                p_err[i].resize(max_depth);
+                is_normal[i].resize(max_depth);
+                is_tumor[i].resize(max_depth * 3);
+            }
             p_err_normal.resize(max_depth);
             is_normal_normal.resize(max_depth);
             is_tumor_normal.resize(max_depth);
