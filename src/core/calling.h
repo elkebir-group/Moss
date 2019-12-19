@@ -67,11 +67,13 @@ namespace moss {
             logMu,
             logNoisePriorComplement,
             eps;
+        bool is_ignore0;
 
         std::vector<std::vector<double>> p_err;
         std::vector<std::vector<char>> is_normal;
         std::vector<std::vector<char>> is_tumor;
         std::vector<bool> is_empty;
+        std::vector<bool> is_all_ref;
         std::vector<int> n_tumor;   //* count of tumor allels in samples: n_tumor_sample x n_tumor_bases
         std::vector<int> n_normal;  //* count of normal allels in samples: n_tumor_sample
         std::vector<double> p_err_normal;
@@ -98,8 +100,8 @@ namespace moss {
 
     public:
 
-        SnvCaller(int n_tumor_sample, const std::string& normal, double mu = 1.0 - 5e-4, int max_depth = 500,
-                  int grid_size = 21);
+        SnvCaller(int n_tumor_sample, const std::string& normal, bool is_ignore0, double mu = 1.0 - 5e-4,
+                   int max_depth = 500, int grid_size = 21);
 
         ~SnvCaller();
 

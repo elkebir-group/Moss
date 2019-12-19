@@ -13,13 +13,16 @@ using namespace moss;
 
 // TODO: limited number of tumor samples?
 // - Use custom arbitrary long binary indicator?
-SnvCaller::SnvCaller(int n_tumor_sample, const std::string& normal, double mu, int max_depth, int grid_size)
+SnvCaller::SnvCaller(int n_tumor_sample, const std::string& normal, bool is_ignore0, double mu, int max_depth,
+                     int grid_size)
     : n_tumor_sample(n_tumor_sample),
       normal_result(VcfReader(normal)),
       mu(mu),
       max_depth(max_depth),
       gridSize(grid_size),
+      is_ignore0(is_ignore0),
       is_empty(n_tumor_sample),
+      is_all_ref(n_tumor_sample),
       n_tumor(n_tumor_sample * 3),
       n_normal(n_tumor_sample),
       p_err(n_tumor_sample, std::vector<double>(max_depth)),
@@ -217,20 +220,33 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, u
     }
     BaseSet tumor_bases = annos.normal_gt.complement();
     calc_likelihood(std::vector<std::vector<moss::Read>>(columns.begin() + 1, columns.end()), annos.normal_gt, tumor_bases);
-    size_t n_valid_tumor_sample = 0;
+    size_t n_potential_tumor_sample = 0;     // n_potential_tumor_sample means: is_ignore0 ? not all=ref : not empty
     annos.cnt_read[0] = columns[0].size();
     for (unsigned long i = 1; i < columns.size(); i++) {
         if (columns[i].empty()) {
             is_empty[i - 1] = true;
         } else {
             is_empty[i - 1] = false;
-            n_valid_tumor_sample++;
+            if (is_ignore0) {
+                is_all_ref[i-1] = true;
+                for (auto &&base : columns[i]) {
+                    if (base.base != ref) {
+                        is_all_ref[i-1] = false;
+                        n_potential_tumor_sample++;
+                        break;
+                    }
+                }
+            } else {
+                n_potential_tumor_sample++;
+            }
         }
         annos.cnt_read[i] = columns[i].size();
     }
-    if (n_valid_tumor_sample == 0) {
+    if (n_potential_tumor_sample == 0) {
         Z = 0;
         annos.tumor_gt = uint8_t(IUPAC_nuc::EQ);
+        annos.quality = -0;
+        annos.log_t_in_normal = -std::numeric_limits<double>::infinity();
         for (int i = 0; i < n_tumor_sample + 1; i++) {
             annos.cnt_tumor[i] = 0;
             annos.genotype[i] = 0;
@@ -267,15 +283,19 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, u
         double nume_gt{},
             evidence{};
         for (int idx_sample = 0; idx_sample < n_tumor_sample; ++idx_sample) {
-            if (is_empty[idx_sample]) {
+            bool skip;
+            if (is_ignore0)
+                skip = is_empty[idx_sample] || is_all_ref[idx_sample];
+            else
+                skip = is_empty[idx_sample];
+            if (skip) {
                 continue;
             }
             nume_gt += likelihoods[idx_sample][idx_nuc][0];
             evidence += log_sum_exp(llh_integral[idx_sample][idx_nuc], likelihoods[idx_sample][idx_nuc][0]);
         }
-        evidence = log_sum_exp(
-            evidence + logPriorZComplement[n_valid_tumor_sample - 1],
-            nume_gt + logAll0[n_valid_tumor_sample - 1]);
+        evidence = log_sum_exp(evidence + logPriorZComplement[n_potential_tumor_sample - 1],
+                               nume_gt + logAll0[n_potential_tumor_sample - 1]);
         if (max_tumor_evidence <= evidence) {
             max_tumor_evidence = evidence;
             annos.tumor_gt = tumor_base;
@@ -298,7 +318,14 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, u
     annos.cnt_tumor[0] = normal_tumor_allele_count;
     std::fill(annos.cnt_type_strand.begin(), annos.cnt_type_strand.end(), 0);
     for (int i = 0; i < n_tumor_sample; ++i) {
-        if (!is_empty[i] && (likelihoods[i][tumor_gt_idx][0] < llh_integral[i][tumor_gt_idx])) {
+        bool has_mutation;
+        if (is_ignore0) {
+            has_mutation = (!is_empty[i] || !is_all_ref[i])
+                           && (likelihoods[i][tumor_gt_idx][0] < llh_integral[i][tumor_gt_idx]);
+        } else {
+            has_mutation = !is_empty[i] && (likelihoods[i][tumor_gt_idx][0] < llh_integral[i][tumor_gt_idx]);
+        }
+        if (has_mutation) {
             annos.genotype[i + 1] = 1;
         } else {
             annos.genotype[i + 1] = 0;

@@ -12,9 +12,12 @@
 #include <chrono>
 #include <iomanip>
 
-int dry_flag = 0;
-int filter_total_flag = 0;
-int filter_vaf_flag = 0;
+struct Flags {
+    int dry = 0;
+    int filter_total = 0;
+    int filter_vaf = 0;
+    int ignore0 = 0;
+} flags;
 
 const option long_options[] =
     {
@@ -27,9 +30,10 @@ const option long_options[] =
         {"tau",     required_argument, nullptr,   't'},
         {"mu",      required_argument, nullptr,   'm'},
         {"max_dep", required_argument, nullptr,   'd'},
-        {"filter-total", no_argument,   &filter_total_flag, 1},
-        {"filter-vaf",   no_argument,   &filter_vaf_flag, 1},
-        {"dry",     no_argument,       &dry_flag,  1},
+        {"filter-total", no_argument,   &flags.filter_total, 1},
+        {"filter-vaf",   no_argument,   &flags.filter_vaf, 1},
+        {"ignore0",     no_argument,   &flags.ignore0, 1},
+        {"dry",     no_argument,       &flags.dry,  1},
         {nullptr,   no_argument,       nullptr,   0}
     };
 
@@ -59,7 +63,8 @@ void print_help() {
               "  -d, --max_dep <depth>  max depth of the dataset, default is 500\n"
               "  --dry                  set to dry run\n"
               "  --filter-total          set to filter variants with total tumor depth < 150\n"
-              "  --filter-vaf            set to filter variants with VAF in any samples < 0.1\n";
+              "  --filter-vaf            set to filter variants with VAF in any samples < 0.1\n"
+              "  --ignore0              ignore samples with ref allele in all reads\n";
     exit(1);
 }
 
@@ -159,7 +164,7 @@ int main(int argc, char **argv) {
         putchar('\n');
     }
 
-    if (dry_flag == 1) {
+    if (flags.dry == 1) {
         std::cout << "# Dry run!" << std::endl;
     }
 
@@ -234,7 +239,7 @@ int main(int argc, char **argv) {
     }
     std::cout << "# Loci merged" << std::endl;
     auto start = std::chrono::system_clock::now();
-    moss::SnvCaller caller(num_tumor_samples, normal_vcf, mu, max_depth);
+    moss::SnvCaller caller(num_tumor_samples, normal_vcf, flags.ignore0, mu, max_depth);
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     std::chrono::duration<double> calling_time{0};
@@ -242,7 +247,7 @@ int main(int argc, char **argv) {
     std::cout << "## Chrom\tPos \t Prob \t Alt \t Genotype:TumorCount:Coverage" << std::endl;
     moss::Annotation anno(num_samples);
     start = std::chrono::system_clock::now();
-    moss::VcfWriter writer{out_vcf, loci, num_tumor_samples, ref_file, bam_files, filter_total_flag, filter_vaf_flag, tau};
+    moss::VcfWriter writer{out_vcf, loci, num_tumor_samples, ref_file, bam_files, flags.filter_total, flags.filter_vaf, tau};
     end = std::chrono::system_clock::now();
     elapsed_seconds = end - start;
     std::cout << "Writer elapsed time: " << elapsed_seconds.count() << std::endl;
@@ -256,7 +261,7 @@ int main(int argc, char **argv) {
         std::cout << "Streamer elapsed time: " << elapsed_seconds.count() << std::endl;
         for (const auto &l : chrom.second) {
             moss::Pileups col = streamer.get_column();
-            if (dry_flag == 0) {
+            if (flags.dry == 0) {
                 // TODO: baseset
                 unsigned long Z;
                 start = std::chrono::system_clock::now();
