@@ -21,20 +21,22 @@ struct Flags {
 
 const option long_options[] =
     {
-        {"bam",     required_argument, nullptr,   'b'},
-        {"ref",     required_argument, nullptr,   'r'},
-        {"output",  required_argument, nullptr,   'o'},
-        {"normal",  required_argument, nullptr,   'n'},
-        {"loci",    required_argument, nullptr,   'l'},
-        {"vcf",     required_argument, nullptr,   'v'},
-        {"tau",     required_argument, nullptr,   't'},
-        {"mu",      required_argument, nullptr,   'm'},
-        {"max_dep", required_argument, nullptr,   'd'},
-        {"filter-total", no_argument,   &flags.filter_total, 1},
-        {"filter-vaf",   no_argument,   &flags.filter_vaf, 1},
-        {"ignore0",     no_argument,   &flags.ignore0, 1},
-        {"dry",     no_argument,       &flags.dry,  1},
-        {nullptr,   no_argument,       nullptr,   0}
+        {"bam",                 required_argument, nullptr,   'b'},
+        {"ref",                 required_argument, nullptr,   'r'},
+        {"output",              required_argument, nullptr,   'o'},
+        {"normal",              required_argument, nullptr,   'n'},
+        {"loci",                required_argument, nullptr,   'l'},
+        {"vcf",                 required_argument, nullptr,   'v'},
+        {"tau",                 required_argument, nullptr,   't'},
+        {"mu",                  required_argument, nullptr,   'm'},
+        {"max_dep",             required_argument, nullptr,   'd'},
+        {"min-base-qual",       required_argument, nullptr,   'B'},
+        {"min-mapping-qual",    required_argument, nullptr,   'M'},
+        {"filter-total",         no_argument,       &flags.filter_total, 1},
+        {"filter-vaf",           no_argument,       &flags.filter_vaf, 1},
+        {"ignore0",             no_argument,       &flags.ignore0, 1},
+        {"dry",                 no_argument,       &flags.dry,  1},
+        {nullptr,               no_argument,       nullptr,   0}
     };
 
 void print_help() {
@@ -60,6 +62,10 @@ void print_help() {
               "Other options:\n"
               "  -t, --tau <TAU>        optional threshold for somatic score, default is 0\n"
               "  -m, --mu <MU>          set somatic mutation prior, 1-5x10^(-m), default is 1-5e-4\n"
+              "  -B, --min-base-qual <MINBASE>\n"
+              "                         minimum threshold for base quality, default is 13\n"
+              "  -M, --min-mapping-qual <MINMAP>\n"
+              "                         minimum threshold for mapping quality, default is 30\n"
               "  -d, --max_dep <depth>  max depth of the dataset, default is 500\n"
               "  --dry                  set to dry run\n"
               "  --filter-total          set to filter variants with total tumor depth < 150\n"
@@ -76,7 +82,7 @@ bool is_file_exist(const std::string &name) {
 
 int main(int argc, char **argv) {
     int c;
-    const char *const short_opts = "b:r:o:n:l:v:t:m:d:h";
+    const char *const short_opts = "b:r:o:n:l:v:t:m:B:M:d:h";
 
 
     // variables
@@ -89,7 +95,10 @@ int main(int argc, char **argv) {
     std::vector<std::string> tumor_vcfs;
     float tau{0};
     double mu{1 - 5e-4};
-    int max_depth{500};
+    int max_depth{500},
+        min_base_qual{13},
+        min_mapping_qual{30};
+
 
     /* getopt_long stores the option index here. */
     int option_index = 0;
@@ -142,6 +151,14 @@ int main(int argc, char **argv) {
 
             case 'm':
                 mu = 1 - 5 * pow(10, -std::stod(optarg));
+                break;
+
+            case 'B':
+                min_base_qual = std::stoi(optarg);
+                break;
+
+            case 'M':
+                min_mapping_qual = std::stoi(optarg);
                 break;
 
             case 'd':
@@ -243,22 +260,22 @@ int main(int argc, char **argv) {
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     std::chrono::duration<double> calling_time{0};
-    std::cout << "SnvCaller elapsed time: " << elapsed_seconds.count() << std::endl;
+    std::cout << "# SnvCaller elapsed time: " << elapsed_seconds.count() << std::endl;
     std::cout << "## Chrom\tPos \t Prob \t Alt \t Genotype:TumorCount:Coverage" << std::endl;
     moss::Annotation anno(num_samples);
     start = std::chrono::system_clock::now();
     moss::VcfWriter writer{out_vcf, loci, num_tumor_samples, ref_file, bam_files, flags.filter_total, flags.filter_vaf, tau};
     end = std::chrono::system_clock::now();
     elapsed_seconds = end - start;
-    std::cout << "Writer elapsed time: " << elapsed_seconds.count() << std::endl;
+    std::cout << "# Writer elapsed time: " << elapsed_seconds.count() << std::endl;
     auto now = std::time(nullptr);
-    std::cout << "Start time: " << std::put_time(std::localtime(&now), "%FT%T%z") << std::endl;
+    std::cout << "# Start time: " << std::put_time(std::localtime(&now), "%FT%T%z") << std::endl;
     for (const auto &chrom : loci) {
         start = std::chrono::system_clock::now();
-        moss::BamStreamer streamer(ref_file, bam_files, moss::MapContigLoci{{chrom.first, chrom.second}});
+        moss::BamStreamer streamer(ref_file, bam_files, moss::MapContigLoci{{chrom.first, chrom.second}}, min_base_qual, min_mapping_qual);
         end = std::chrono::system_clock::now();
         elapsed_seconds = end - start;
-        std::cout << "Streamer elapsed time: " << elapsed_seconds.count() << std::endl;
+        std::cout << "# Streamer elapsed time: " << elapsed_seconds.count() << std::endl;
         for (const auto &l : chrom.second) {
             moss::Pileups col = streamer.get_column();
             if (flags.dry == 0) {
@@ -286,9 +303,9 @@ int main(int argc, char **argv) {
             }
         }
     }
-    std::cout << "Calling elapsed time: " << calling_time.count() << std::endl;
+    std::cout << "# Calling elapsed time: " << calling_time.count() << std::endl;
     now = std::time(nullptr);
-    std::cout << "End time: " << std::put_time(std::localtime(&now), "%FT%T%z") << std::endl;
+    std::cout << "# End time: " << std::put_time(std::localtime(&now), "%FT%T%z") << std::endl;
     return 0;
 }
 

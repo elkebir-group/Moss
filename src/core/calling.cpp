@@ -341,7 +341,7 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, u
                 } else {
                     annos.cnt_type_strand[i*4 + 1] += 1;    // ref reverse
                 }
-            } else if (tumor_bases.contain(read.base)) {
+            } else if (annos.tumor_gt == read.base) {
                 if (!read.is_reverse_strand) {
                     annos.cnt_type_strand[i*4 + 2] += 1;    // alt forward
                 } else {

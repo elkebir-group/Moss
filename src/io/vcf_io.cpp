@@ -148,7 +148,7 @@ bool VcfReader::empty() {
 
 VcfWriter::VcfWriter(const std::string &filename, MapContigLoci loci, unsigned long num_tumor_samples,
                      std::string ref_file, std::vector<std::string> bam_files, bool filter_total_dp, bool filter_vaf, float qual_thr)
-    : is_filter_total_dp(filter_total_dp), qual_thr(qual_thr) {
+    : is_filter_total_dp(filter_total_dp), is_filter_vaf(filter_vaf), qual_thr(qual_thr) {
     ofile = bcf_open(filename.c_str(), "w");
     header = bcf_hdr_init("w");
     // FILTER
@@ -158,7 +158,7 @@ VcfWriter::VcfWriter(const std::string &filename, MapContigLoci loci, unsigned l
     (true, filter_low_qual, qual_thr,
         "##FILTER=<ID=LOW_QUAL,Description=\"QUAL is below the threshold\">")
     (true, filter_low_tumor_support,
-        "##FILTER=<ID=LOW_TUMOR_SUPP,Description=\"Less than 4 reads support any tumor sample\">")
+        "##FILTER=<ID=LOW_TUMOR_SUPP,Description=\"Less than 4 reads support in all tumor samples\">")
     (is_filter_total_dp, filter_low_total_depth,
         "##FILTER=<ID=LOW_TOTAL_DP,Description=\"Total depth of 23 samples < 150\">")
     (is_filter_vaf, filter_low_vaf,
