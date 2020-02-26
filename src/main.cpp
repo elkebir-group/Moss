@@ -32,6 +32,7 @@ const option long_options[] =
         {"max_dep",             required_argument, nullptr,   'd'},
         {"min-base-qual",       required_argument, nullptr,   'B'},
         {"min-mapping-qual",    required_argument, nullptr,   'M'},
+        {"grid-size",           required_argument, nullptr,   'g'},
         {"filter-total",         no_argument,       &flags.filter_total, 1},
         {"filter-vaf",           no_argument,       &flags.filter_vaf, 1},
         {"ignore0",             no_argument,       &flags.ignore0, 1},
@@ -67,6 +68,8 @@ void print_help() {
               "  -M, --min-mapping-qual <MINMAP>\n"
               "                         minimum threshold for mapping quality, default is 30\n"
               "  -d, --max_dep <depth>  max depth of the dataset, default is 500\n"
+              "  -g, --grid-size <grid> number of grid points in [0, 1] for approximate integration,\n"
+              "                         default is 20, must be non-negative\n"
               "  --dry                  set to dry run\n"
               "  --filter-total          set to filter variants with total tumor depth < 150\n"
               "  --filter-vaf            set to filter variants with VAF in any samples < 0.1\n"
@@ -97,7 +100,8 @@ int main(int argc, char **argv) {
     double mu{1 - 5e-4};
     int max_depth{500},
         min_base_qual{13},
-        min_mapping_qual{30};
+        min_mapping_qual{30},
+        grid_size{20};
 
 
     /* getopt_long stores the option index here. */
@@ -159,6 +163,10 @@ int main(int argc, char **argv) {
 
             case 'M':
                 min_mapping_qual = std::stoi(optarg);
+                break;
+
+            case 'g':
+                grid_size = std::stoi(optarg);
                 break;
 
             case 'd':
@@ -256,7 +264,7 @@ int main(int argc, char **argv) {
     }
     std::cout << "# Loci merged" << std::endl;
     auto start = std::chrono::system_clock::now();
-    moss::SnvCaller caller(num_tumor_samples, normal_vcf, flags.ignore0, mu, max_depth);
+    moss::SnvCaller caller(num_tumor_samples, normal_vcf, flags.ignore0, mu, max_depth, grid_size+1);
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     std::chrono::duration<double> calling_time{0};
@@ -280,16 +288,14 @@ int main(int argc, char **argv) {
             moss::Pileups col = streamer.get_column();
             if (flags.dry == 0) {
                 // TODO: baseset
-                unsigned long Z;
                 start = std::chrono::system_clock::now();
-                auto log_proba_non_soma = caller.calling(chrom.first, l, col, Z, anno);
+                auto log_proba_non_soma = caller.calling(chrom.first, l, col, anno);
                 end = std::chrono::system_clock::now();
                 calling_time += end - start;
 
                 writer.write_record(chrom.first, l, col.get_ref(), anno, num_samples);
 
                 if (log_proba_non_soma < tau) {
-                    std::string states(std::bitset<sizeof(Z)>(Z).to_string());
                     std::cout << chrom.first << '\t' << l + 1 << '\t' << -10 * log_proba_non_soma << '\t'
                               << seq_nt16_str[anno.tumor_gt] << '\t';
                     for (size_t i = 0; i < num_samples; i++) {

@@ -146,8 +146,8 @@ bool VcfReader::empty() {
     return filename.empty();
 }
 
-VcfWriter::VcfWriter(const std::string &filename, MapContigLoci loci, unsigned long num_tumor_samples,
-                     std::string ref_file, std::vector<std::string> bam_files, bool filter_total_dp, bool filter_vaf, float qual_thr)
+VcfWriter::VcfWriter(const std::string &filename, const MapContigLoci &loci, unsigned long num_tumor_samples,
+                     std::string ref_file, const std::vector<std::string> &bam_files, bool filter_total_dp, bool filter_vaf, float qual_thr)
     : is_filter_total_dp(filter_total_dp), is_filter_vaf(filter_vaf), qual_thr(qual_thr) {
     ofile = bcf_open(filename.c_str(), "w");
     header = bcf_hdr_init("w");

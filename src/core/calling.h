@@ -78,8 +78,11 @@ namespace moss {
         std::vector<int> n_normal;  //* count of normal allels in samples: n_tumor_sample
         std::vector<double> p_err_normal;
         std::vector<int> is_normal_normal;
-        std::vector<int> is_tumor_normal;
-        std::vector<double> likelihoods_normal;
+        std::vector<char> is_tumor_normal;
+        std::vector<int> n_tumor_in_normal;
+        int n_normal_in_normal;
+        std::vector<std::vector<double>> likelihoods_normal;
+        std::vector<double> log_TIN;
 
         BaseSet normal_calling(const std::vector<Read> &column, uint8_t ref);
 
@@ -96,7 +99,6 @@ namespace moss {
          * @param tumor_base : return MLE tumor base
          */
         void calc_likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet normal_bases, BaseSet tumor_base);
-        double in_normal(const Pileups &pile, BaseSet &normal_gt, const uint8_t &tumor_gt);
 
     public:
 
@@ -106,7 +108,7 @@ namespace moss {
         ~SnvCaller();
 
         double
-        calling(const std::string &chrom, locus_t pos, const Pileups &pile, unsigned long &Z, Annotation &anno);
+        calling(const std::string &chrom, locus_t pos, const Pileups &pile, Annotation &anno);
     };
 }
 

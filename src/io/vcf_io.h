@@ -75,8 +75,8 @@ namespace moss {
         std::vector<Filter> filters;
 
     public:
-        VcfWriter(const std::string &filename, MapContigLoci loci, unsigned long num_tumor_samples,
-                  std::string ref_file, std::vector<std::string> bam_files, bool filter_total_dp = false, bool filter_vaf = false, float qual_thr = 0);
+        VcfWriter(const std::string &filename, const MapContigLoci &loci, unsigned long num_tumor_samples,
+                  std::string ref_file, const std::vector<std::string> &bam_files, bool filter_total_dp = false, bool filter_vaf = false, float qual_thr = 0);
 
         ~VcfWriter();
 
