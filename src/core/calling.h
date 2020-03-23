@@ -28,6 +28,9 @@ namespace moss {
     template<typename T>
     T log_sum_exp(T a, T b);
 
+    template<typename T>
+    T log_sum_exp_array(std::vector<T> array1, std::vector<T> array2);
+
     /*!
      * Initialize max_elem to be -infinity, return accumulate.
      * @tparam T
@@ -83,6 +86,7 @@ namespace moss {
         int n_normal_in_normal;
         std::vector<std::vector<double>> likelihoods_normal;
         std::vector<double> log_TIN;
+        std::vector<double> log_beta_pdf;
 
         BaseSet normal_calling(const std::vector<Read> &column, uint8_t ref);
 

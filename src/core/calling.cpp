@@ -32,6 +32,7 @@ SnvCaller::SnvCaller(int n_tumor_sample, const std::string& normal, bool is_igno
       n_tumor_in_normal(3),
       log_TIN(3),
       likelihoods_normal(3, std::vector<double>(grid_size)),
+      log_beta_pdf(gridSize),
       likelihoods(n_tumor_sample, std::vector<std::vector<double>>(3, std::vector<double>(grid_size))) {
     stepSize = 1.0 / (gridSize - 1);
     logMu = log1p(mu - 1);
@@ -50,6 +51,12 @@ SnvCaller::SnvCaller(int n_tumor_sample, const std::string& normal, bool is_igno
     }
     logUniform = -log(gridSize);
     eps = 0.1;
+    // use Beta(1, beta) distribution for frequency prior
+    double beta{40};
+    for (int idx_step = 0; idx_step < gridSize; idx_step++) {
+        double f = idx_step * stepSize;
+        log_beta_pdf[idx_step] = std::log(beta) + (beta-1) * std::log(1-f);
+    }
 }
 
 SnvCaller::~SnvCaller() {
@@ -236,9 +243,15 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, A
     // pre-compute integral of log likelihood under z = 0, 1
     // integral over frequency, P(D_i | Z_i=z_i, Gn)
     std::vector<std::vector<double> > llh_integral(n_tumor_sample);
-    std::vector<double> llh_integral_normal(tumor_bases.size());
+    std::vector<double> llh_integral_normal_z1(tumor_bases.size());
+    std::vector<double> llh_integral_normal_z0(tumor_bases.size());
     for (int idx_base = 0; idx_base < tumor_bases.size(); ++idx_base) {
-        llh_integral_normal[idx_base] = log_sum_exp(likelihoods_normal[idx_base]) + logUniform;
+        // trapezoidal rule
+        double a = log_sum_exp_array(likelihoods_normal[idx_base], log_beta_pdf);
+        double b = likelihoods_normal[idx_base][0] + log_beta_pdf[0] - std::log(2);
+        double sum = a + std::log(1 - std::exp(b - a));
+        llh_integral_normal_z0[idx_base] = sum + logUniform;
+        llh_integral_normal_z1[idx_base] = log_sum_exp(likelihoods_normal[idx_base]) + logUniform;
     }
     {int idx_sample = 0;
     for (const auto &sample : likelihoods) {
@@ -277,10 +290,10 @@ SnvCaller::calling(const std::string &chrom, locus_t pos, const Pileups &pile, A
             nume_gt += likelihoods[idx_sample][idx_nuc][0];
             evidence += log_sum_exp(llh_integral[idx_sample][idx_nuc], likelihoods[idx_sample][idx_nuc][0]);
         }
-        nume_normal = evidence + llh_integral_normal[idx_nuc] + logPriorZComplement[n_potential_tumor_sample];
-        TIN_evidence = evidence + log_sum_exp(llh_integral_normal[idx_nuc], likelihoods_normal[idx_nuc][0]);
+        nume_normal = evidence + llh_integral_normal_z1[idx_nuc] + logPriorZComplement[n_potential_tumor_sample];
+        TIN_evidence = evidence + log_sum_exp(llh_integral_normal_z1[idx_nuc], llh_integral_normal_z0[idx_nuc]);
         TIN_evidence = log_sum_exp(TIN_evidence + logPriorZComplement[n_potential_tumor_sample],
-                                   nume_gt + likelihoods_normal[idx_nuc][0] + logAll0[n_potential_tumor_sample]);
+                                   nume_gt + llh_integral_normal_z0[idx_nuc] + logAll0[n_potential_tumor_sample]);
         log_TIN[idx_nuc] = nume_normal - TIN_evidence;
         evidence = log_sum_exp(evidence + logPriorZComplement[n_potential_tumor_sample - 1],
                                nume_gt + logAll0[n_potential_tumor_sample - 1]);
@@ -375,6 +388,23 @@ T moss::log_sum_exp(T a, T b) {
     } else {
         return b + log(exp(a - b) + 1.0);
     }
+}
+
+template<typename T>
+T moss::log_sum_exp_array(std::vector<T> array1, std::vector<T> array2) {
+    T max_elem = -std::numeric_limits<T>::infinity(),
+        accum{};
+    for (int idx = 0; idx < array1.size(); idx++) {
+        T item = array1[idx] + array2[idx];
+        if (item >= max_elem) {
+            accum *= exp(max_elem - item);
+            accum += 1.f;
+            max_elem = item;
+        } else {
+            accum += exp(item - max_elem);
+        }
+    }
+    return max_elem + log(accum);
 }
 
 template<typename T>
