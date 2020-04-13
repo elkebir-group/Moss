@@ -80,7 +80,7 @@ namespace moss {
 
         ~VcfWriter();
 
-        void write_record(std::string chrom, int pos, uint8_t ref, Annotation &annos, int num_samples);
+        void write_record(std::string chrom, std::pair<const locus_t, Aggregate> consensus, uint8_t ref, Annotation &annos, int num_samples);
 
         FilterHelper addFilters();
     };

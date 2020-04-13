@@ -182,6 +182,12 @@ VcfWriter::VcfWriter(const std::string &filename, const MapContigLoci &loci, uns
     // INFO
     bcf_hdr_append(header,
                    "##INFO=<ID=TIN,Number=1,Type=Float,Description=\"Probability of normal also has tumor genotype\">");
+    bcf_hdr_append(header,
+                   "##INFO=<ID=SGT,Number=1,Type=String,Description=\"Most likely somatic genotype\">");
+    bcf_hdr_append(header,
+                   "##INFO=<ID=PASSBASE,Number=0,Type=Flag,Description=\"Pass the base caller in at least 1 sample\">");
+    bcf_hdr_append(header,
+                   "##INFO=<ID=NUMPASS,Number=1,Type=Integer,Description=\"Number of samples that pass the base caller\">");
     ref_idx = fai_load(ref_file.c_str());
     for (const auto &contig : loci) {
         int len = faidx_seq_len(ref_idx, contig.first.c_str());
@@ -287,14 +293,14 @@ bool VcfWriter::filter_empty_strand(Annotation &anno) {
 }
 
 void
-VcfWriter::write_record(std::string chrom, int pos, uint8_t ref, Annotation &annos, int num_samples) {
+VcfWriter::write_record(std::string chrom, std::pair<const locus_t, Aggregate> consensus, uint8_t ref, Annotation &annos, int num_samples) {
     auto &depth = annos.cnt_read;
     auto &tumor_count = annos.cnt_tumor;
     auto &zq = annos.zq;
     auto &Z = annos.genotype;
     bcf_update_filter(header, rec, nullptr, 0);
     rec->qual = -10 * annos.quality;
-    rec->pos = pos;
+    rec->pos = consensus.first;
     rec->rid = bcf_hdr_name2id(header, chrom.c_str());
     uint8_t alt = annos.tumor_gt;
     std::string alleles{seq_nt16_str[ref]};
@@ -306,6 +312,10 @@ VcfWriter::write_record(std::string chrom, int pos, uint8_t ref, Annotation &ann
     bcf_update_format_int32(header, rec, "Z", Z.data(), num_samples);
     bcf_update_format_float(header, rec, "ZQ", zq.data(), num_samples);
     bcf_update_info_float(header, rec, "TIN", &annos.log_t_in_normal, 1);
+    if (consensus.second.is_pass) {
+        bcf_update_info_flag(header, rec, "PASSBASE", NULL, 1);
+    }
+    bcf_update_info_int32(header, rec, "NUMPASS", &consensus.second.num_pass, 1);
     std::vector<float> SOR(num_samples);
     for (int i = 0; i < num_samples; i++) {
         float a = annos.cnt_type_strand[4*i] + 1;

@@ -121,11 +121,11 @@ BamStreamer::BamStreamer(std::string ref_file_name, const std::vector<std::strin
         int idx_loc = 0;
         uint32_t min = 0xFFFFFFFF,
             max = 0;
-        for (const auto &locus : contig.second) {
-            intervals[idx_loc].beg = locus;
-            intervals[idx_loc].end = locus + 1;
-            min = locus < min ? locus : min;
-            max = locus + 1 > max ? locus + 1 : max;
+        for (const auto &l : contig.second) {
+            intervals[idx_loc].beg = l.first;
+            intervals[idx_loc].end = l.first + 1;
+            min = l.first < min ? l.first : min;
+            max = l.first + 1 > max ? l.first + 1 : max;
             idx_loc++;
         }
         for (int idx_sample = 0; idx_sample < num_samples; ++idx_sample) {
@@ -219,10 +219,10 @@ Pileups BamStreamer::get_column() {
                 }
 
                 // find new active loci
-                while (*iters[j] <= windows[j].second) {
+                while (iters[j]->first <= windows[j].second) {
                     if (iters[j] !=
                         this->loci.at(std::string(meta[j][0]->header->target_name[read->core.tid])).cend()) {
-                        actives[j].emplace_back(*iters[j]);
+                        actives[j].emplace_back(iters[j]->first);
                         buffers[j].emplace_back(std::vector<Read>());
                         ++iters[j];
                     } else {
@@ -246,7 +246,7 @@ Pileups BamStreamer::get_column() {
                     }
                     idx_pos++;
                 }
-            } while (windows[j].first <= actives[j][0]);
+            } while (windows[j].first <= actives[j][0]); // FIXME: Conditional jump or move depends on uninitialised value(s)
         }
 
         if (!actives[j].empty()) {

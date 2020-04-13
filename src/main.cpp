@@ -289,14 +289,14 @@ int main(int argc, char **argv) {
             if (flags.dry == 0) {
                 // TODO: baseset
                 start = std::chrono::system_clock::now();
-                auto log_proba_non_soma = caller.calling(chrom.first, l, col, anno);
+                auto log_proba_non_soma = caller.calling(chrom.first, l.first, col, anno);
                 end = std::chrono::system_clock::now();
                 calling_time += end - start;
 
                 writer.write_record(chrom.first, l, col.get_ref(), anno, num_samples);
 
                 if (log_proba_non_soma < tau) {
-                    std::cout << chrom.first << '\t' << l + 1 << '\t' << -10 * log_proba_non_soma << '\t'
+                    std::cout << chrom.first << '\t' << l.first + 1 << '\t' << -10 * log_proba_non_soma << '\t'
                               << seq_nt16_str[anno.tumor_gt] << '\t';
                     for (size_t i = 0; i < num_samples; i++) {
                         std::cout << "0|" << anno.genotype[i] << ':'

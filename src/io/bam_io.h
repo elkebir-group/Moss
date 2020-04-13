@@ -50,7 +50,7 @@ namespace moss {
         std::vector<std::vector<hts_reglist_t>> regions;    //!< regions of interest for sam_itr_regions
         std::vector<std::pair<locus_t, locus_t>> windows;   //!< sliding windows for each sample
         std::vector<int> tids;                              //!< current hts tid (current chrom) for each sample
-        std::vector<std::set<locus_t>::iterator> iters;     //!< iterator point to loci
+        std::vector<std::map<locus_t, Aggregate>::const_iterator> iters;  //!< iterator point to loci
         std::vector<std::deque<locus_t>> actives;           //!< active loci for each sample
         std::vector<Buffer> buffers;                        //!< buffer for Pileups in building
         const static uint16_t FAIL_FLAGS = BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP;

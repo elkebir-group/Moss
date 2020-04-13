@@ -21,9 +21,11 @@ moss::MapContigLoci moss::merge_loci(std::vector<std::string> filenames) {
             std::getline(temp, position, ':');
             auto item = loci.find(target);
             if (item != loci.end()) {
-                item->second.insert(std::stoul(position));
+                item->second.emplace(std::make_pair(
+                    std::stoul(position),
+                    Aggregate(false, 0)));
             } else {
-                loci.insert(std::make_pair(target, std::set<unsigned long>({std::stoul(position)})));
+                loci.insert(std::make_pair(target, std::map<locus_t, Aggregate>{{std::stoul(position), {false, 0}}}));
             }
         }
         file.close();
@@ -39,12 +41,22 @@ moss::MapContigLoci moss::merge_vcf(std::vector<std::string> filenames) {
             auto item = loci.find(chrom_pos.first);
             if (item != loci.end()) {
                 for (auto &&pos_rec : chrom_pos.second) {
-                    item->second.insert(pos_rec.first);
+                    auto found_pos = item->second.find(pos_rec.first);
+                    if (found_pos != item->second.end()) {
+                        found_pos->second.is_pass = pos_rec.second.is_pass | found_pos->second.is_pass;
+                        found_pos->second.num_pass += static_cast<unsigned>(pos_rec.second.is_pass);
+                    } else {
+                        item->second.emplace(std::make_pair(
+                            pos_rec.first,
+                            Aggregate(pos_rec.second.is_pass, static_cast<unsigned>(pos_rec.second.is_pass))));
+                    }
                 }
             } else {
-                loci.insert(std::make_pair(chrom_pos.first, std::set<unsigned long>()));
+                loci.insert(std::make_pair(chrom_pos.first, std::map<locus_t, Aggregate>()));
                 for (auto &&pos_rec : chrom_pos.second) {
-                    loci.at(chrom_pos.first).insert(pos_rec.first);
+                    loci.at(chrom_pos.first).emplace(std::make_pair(
+                        pos_rec.first,
+                        Aggregate(pos_rec.second.is_pass, static_cast<unsigned>(pos_rec.second.is_pass))));
                 }
             }
         }

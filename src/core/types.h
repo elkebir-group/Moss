@@ -14,8 +14,15 @@
 namespace moss {
     using locus_t = unsigned long;
 
-    // TODO: is std::set really needed here?
-    using MapContigLoci = std::map<std::string, std::set<locus_t>>;
+    struct Aggregate {
+    public:
+        bool is_pass;
+        unsigned num_pass;
+
+        Aggregate(bool is_pass, unsigned num_pass) : is_pass(is_pass), num_pass(num_pass) {}
+    };
+
+    using MapContigLoci = std::map<std::string, std::map<locus_t, Aggregate>>;
 
     enum class IUPAC_nuc : std::uint8_t {
         EQ, A, C, M, G, R, S, V, T, W, Y, H, K, D, B, N
