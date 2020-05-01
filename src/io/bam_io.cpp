@@ -62,57 +62,44 @@ void resolve_cigar(bam1_t *b, int32_t pos, PileupMeta *p) {
     }
 }
 
-BamStreamer::BamStreamer(std::string ref_file_name, const std::vector<std::string> &bam_file_names,
-                         const MapContigLoci &loci, int min_baseQ, int min_mapQ, bool filter_edit_distance)
-    : num_samples(bam_file_names.size()),
+BamStreamer::BamStreamer(const std::string &ref_file_name,
+                         const std::string &bam_file_name,
+                         const MapContigLoci loci,
+                         int min_baseQ,
+                         int min_mapQ,
+                         bool filter_edit_distance)
+    : loci(loci),
       min_base_qual(min_baseQ),
       min_map_qual(min_mapQ),
-      reference(std::move(ref_file_name)),
-      loci(loci),
-      tids(bam_file_names.size(), -1),
+      tid(-1),
       is_filter_edit_distance(filter_edit_distance) {
-    // ref_fp = fai_load(reference.c_str());
-    ref_fp = fai_load3(reference.c_str(), (reference + ".fai").c_str(), nullptr, 0x0);
-    if (ref_fp == nullptr) {
-        std::cerr << "Error: Failed to open reference file " << reference << std::endl;
-    }
-    meta.reserve(num_samples);
     htsFormat fmt = {};
-    for (const std::string &bamFile : bam_file_names) {
-        samFile *fp = sam_open_format(bamFile.c_str(), "rb", &fmt);
-        if (fp == nullptr) {
-            std::cerr << "Error: Failed to open BAM file " << bamFile << std::endl;
-            break;
-        }
-        hts_idx_t *idx = sam_index_load(fp, bamFile.c_str());
-        if (idx == nullptr) {
-            std::cerr << "Error: Failed to open BAM index " << bamFile << std::endl;
-            break;
-        }
-        bam_hdr_t *hdr = sam_hdr_read(fp);
-        if (hdr == nullptr) {
-            std::cerr << "Error: Failed to fetch header from BAM file " << bamFile
-                      << ".fai , the file may be broken."
-                      << std::endl;
-            break;
-        }
-        auto tmp = new data_t *[1];
-        tmp[0] = new data_t[1];
-        tmp[0][0] = {fp, nullptr, idx, hdr};
-        meta.emplace_back(tmp);
+    samFile *fp = sam_open_format(bam_file_name.c_str(), "rb", &fmt);
+    if (fp == nullptr) {
+        std::cerr << "Error: Failed to open BAM file " << bam_file_name << std::endl;
+        exit(1);
     }
-    regions.reserve(num_samples);
-    windows.reserve(num_samples);
-    iters.reserve(num_samples);
-    actives.reserve(num_samples);
-    buffers.reserve(num_samples);
-    for (int idx_sample = 0; idx_sample < num_samples; ++idx_sample) {
-        regions.emplace_back(std::vector<hts_reglist_t>());
-        regions.back().reserve(loci.size());
-        windows.emplace_back(std::make_pair(0, 0));
-        actives.emplace_back(std::deque<locus_t>());
-        buffers.emplace_back(Buffer());
+    hts_idx_t *idx = sam_index_load(fp, bam_file_name.c_str());
+    if (idx == nullptr) {
+        std::cerr << "Error: Failed to open BAM index " << bam_file_name << std::endl;
+        exit(1);
     }
+    bam_hdr_t *hdr = sam_hdr_read(fp);
+    if (hdr == nullptr) {
+        std::cerr << "Error: Failed to fetch header from BAM file " << bam_file_name
+                    << ".fai , the file may be broken."
+                    << std::endl;
+        exit(1);
+    }
+    auto tmp = new data_t *[1];
+    tmp[0] = new data_t[1];
+    tmp[0][0] = {fp, nullptr, idx, hdr};
+    meta = tmp;
+    region = std::vector<hts_reglist_t>();
+    region.reserve(loci.size());
+    window = std::make_pair(0, 0);
+    actives = std::deque<locus_t>();
+    buffer = Buffer();
     for (const auto &contig : this->loci) {
         auto intervals = new hts_pair32_t[contig.second.size()];
         // TODO: avoid copying this?
@@ -128,43 +115,45 @@ BamStreamer::BamStreamer(std::string ref_file_name, const std::vector<std::strin
             max = l.first + 1 > max ? l.first + 1 : max;
             idx_loc++;
         }
-        for (int idx_sample = 0; idx_sample < num_samples; ++idx_sample) {
-            hts_reglist_t list{
-                reg,
-                bam_name2id(meta[idx_sample][0]->header, contig.first.c_str()),
-                intervals,
-                static_cast<uint32_t>(contig.second.size()),
-                min,
-                max
-            };
-            regions[idx_sample].emplace_back(list);
-        }
+        hts_reglist_t list{
+            reg,
+            bam_name2id(meta[0]->header, contig.first.c_str()),
+            intervals,
+            static_cast<uint32_t>(contig.second.size()),
+            min,
+            max
+        };
+        region.emplace_back(list);
     }
-    for (int j = 0; j < num_samples; ++j) {
-        if ((meta[j][0]->iter = sam_itr_regions(meta[j][0]->index, meta[j][0]->header, regions[j].data(),
-                                                regions[j].size())) == nullptr) {
-            exit(EXIT_FAILURE);
-        }
+    if ((meta[0]->iter = sam_itr_regions(meta[0]->index, meta[0]->header, region.data(),
+                                            region.size())) == nullptr) {
+        exit(EXIT_FAILURE);
     }
 }
+
+// BamStreamer::BamStreamer(const BamStreamer &other)
+//     : min_base_qual(other.min_base_qual),
+//       min_map_qual(other.min_map_qual),
+//       loci(std::move(loci)),
+//       meta(other.meta),
+//       region(std::move(other.region)),
+//       window(std::move(other.window)),
+//       tid(other.tid),
+//       iter(std::move(other.iter )),
+//       actives(std::move(other.actives)),
+//       buffer(std::move(other.buffer)),
+//       is_filter_edit_distance(other.is_filter_edit_distance) {}
 
 BamStreamer::~BamStreamer() {
-    fai_destroy(ref_fp);
-    for (auto &item : meta) {
-        sam_close(item[0]->sam_fp);
-        bam_hdr_destroy(item[0]->header);
-        delete[](item[0]);
-        delete[](item);
-    }
-    for (const auto &reg : regions[0]) {
-        delete[](reg.intervals);
-        delete[](reg.reg);
-    }
+    sam_close(meta[0]->sam_fp);
+    bam_hdr_destroy(meta[0]->header);
+    delete[](meta[0]);
+    delete[](meta);
+    delete[](region[0].intervals);
+    delete[](region[0].reg);
 }
 
-// TODO: do this contig-wise, make sure all samples are in the same contig simultaneously
-Pileups BamStreamer::get_column() {
-    Pileups read_col(num_samples);
+std::vector<Read> BamStreamer::get_column(std::string &ret_contig, int &ret_pos) {
     bool not_found = true;
     // begin pileup
     bam1_t *read = bam_init1();
@@ -173,108 +162,188 @@ Pileups BamStreamer::get_column() {
      * \details For each sample, get reads until the first active locus in the queue is finished,
      * then emplace in the output vector
      */
-    for (int j = 0; j < num_samples; ++j) {
-        int cnt = 0;
-        if (actives[j].empty() || windows[j].first <= actives[j][0]) {
-            do {
-                ret = sam_itr_multi_next(meta[j][0]->sam_fp, meta[j][0]->iter, read);
-                if (ret < 0) {
+    int cnt = 0;
+    if (actives.empty() || window.first <= actives[0]) {
+        do {
+            ret = sam_itr_multi_next(meta[0]->sam_fp, meta[0]->iter, read);
+            if (ret < 0) {
+                break;
+            }
+            locus_t begin = read->core.pos;
+            locus_t end = bam_endpos(read);
+            cnt++;
+            // next contig
+            if (read->core.tid != tid) {
+                tid = read->core.tid;
+                window.second = 0;
+                iter = this->loci.at(std::string(meta[0]->header->target_name[read->core.tid])).cbegin();
+            }
+            if (read->core.tid < 0 || (read->core.flag & FAIL_FLAGS)) {
+                continue;
+            }
+            // TODO: optional
+            if (read->core.qual < min_map_qual) {
+                continue;
+            }
+            if (is_filter_edit_distance) {
+                uint8_t *nm = bam_aux_get(read, "NM");
+                if (nm) {
+                    int64_t edit_dist = bam_aux2i(nm);
+                    if (edit_dist > 3) {
+                        continue;
+                    }
+                }
+            }
+            // update window
+            window.first = begin;
+            if (end > window.second) {
+                window.second = end;
+            }
+
+            // find new active loci
+            while (iter->first <= window.second) {
+                if (iter !=
+                    this->loci.at(std::string(meta[0]->header->target_name[read->core.tid])).cend()) {
+                    actives.emplace_back(iter->first);
+                    buffer.emplace_back(std::vector<Read>());
+                    ++iter;
+                } else {
                     break;
                 }
-                locus_t begin = read->core.pos;
-                locus_t end = bam_endpos(read);
-                cnt++;
-                // next contig
-                if (read->core.tid != tids[j]) {
-                    tids[j] = read->core.tid;
-                    windows[j].second = 0;
-                    if (iters.size() <= j) {
-                        iters.push_back(
-                            this->loci.at(std::string(meta[j][0]->header->target_name[read->core.tid])).cbegin());
-                    } else {
-                        iters[j] = (this->loci.at(
-                            std::string(meta[j][0]->header->target_name[read->core.tid])).cbegin());
-                    }
-                }
-                if (read->core.tid < 0 || (read->core.flag & FAIL_FLAGS)) {
-                    continue;
-                }
-                // TODO: optional
-                if (read->core.qual < min_map_qual) {
-                    continue;
-                }
-                if (is_filter_edit_distance) {
-                    uint8_t *nm = bam_aux_get(read, "NM");
-                    if (nm) {
-                        int64_t edit_dist = bam_aux2i(nm);
-                        if (edit_dist > 3) {
-                            continue;
-                        }
-                    }
-                }
-                // update window
-                windows[j].first = begin;
-                if (end > windows[j].second) {
-                    windows[j].second = end;
-                }
-
-                // find new active loci
-                while (iters[j]->first <= windows[j].second) {
-                    if (iters[j] !=
-                        this->loci.at(std::string(meta[j][0]->header->target_name[read->core.tid])).cend()) {
-                        actives[j].emplace_back(iters[j]->first);
-                        buffers[j].emplace_back(std::vector<Read>());
-                        ++iters[j];
-                    } else {
-                        break;
-                    }
-                }
-                // push into queue
-                int idx_pos = 0;
-                for (const auto &pos : actives[j]) {
-                    if (pos >= windows[j].first && pos < end) {
-                        PileupMeta p{};
-                        resolve_cigar(read, pos, &p);
-                        if (!p.is_del && p.qpos >= 0 && p.qpos < read->core.l_qseq) {
-                            uint8_t base_qual = bam_get_qual(read)[p.qpos];
-                            if (base_qual >= min_base_qual) {
-                                buffers[j][idx_pos].push_back(
-                                    Read{static_cast<uint8_t >(bam_seqi(bam_get_seq(read), p.qpos)),
-                                         base_qual, read->core.flag & BAM_FREVERSE});
-                            }
-                        }
-                    }
-                    idx_pos++;
-                }
-            } while (windows[j].first <= actives[j][0]); // FIXME: Conditional jump or move depends on uninitialised value(s)
-        }
-
-        if (!actives[j].empty()) {
-            // find reference, only once
-            if (not_found) {
-                int len_seq;
-                char *temp = faidx_fetch_seq(ref_fp, meta[j][0]->header->target_name[tids[j]], actives[j].front(),
-                                             actives[j].front(), &len_seq);
-                if (temp != nullptr) {
-                    read_col.set_ref(temp[0]);
-                    free(temp);
-                } else {
-                    std::cerr << "Error BamStreamer::get_column: reference error." << std::endl;
-                    exit(EXIT_FAILURE);
-                }
-                not_found = false;
             }
-            actives[j].pop_front();
-        }
-        if (buffers[j].empty()) {
-            read_col.emplace_read_column(std::vector<Read>());
-        } else {
-            read_col.emplace_read_column(std::move(buffers[j].front()));
-            buffers[j].pop_front();
-        }
+            // push into queue
+            int idx_pos = 0;
+            for (const auto &pos : actives) {
+                if (pos >= window.first && pos < end) {
+                    PileupMeta p{};
+                    resolve_cigar(read, pos, &p);
+                    if (!p.is_del && p.qpos >= 0 && p.qpos < read->core.l_qseq) {
+                        uint8_t base_qual = bam_get_qual(read)[p.qpos];
+                        if (base_qual >= min_base_qual) {
+                            buffer[idx_pos].emplace_back(static_cast<uint8_t>(bam_seqi(bam_get_seq(read), p.qpos)),
+                                                         base_qual,
+                                                         static_cast<bool>(read->core.flag & BAM_FREVERSE),
+                                                         std::string(bam_get_qname(read)));
+                        }
+                    }
+                }
+                idx_pos++;
+            }
+        } while (window.first <= actives[0]); // FIXME: Conditional jump or move depends on uninitialised value(s)
+    }
+
+    if (!actives.empty()) {
+        ret_contig = meta[0]->header->target_name[tid];
+        ret_pos = actives.front();
+        actives.pop_front();
+    }
+
+    std::vector<Read> sample_column;
+    if (buffer.empty()) {
+        sample_column = std::vector<Read>();
+    } else {
+        sample_column = std::move(buffer.front());
+        buffer.pop_front();
     }
 
     bam_destroy1(read);
+    return sample_column;
+}
+
+PairedBamStreamer::PairedBamStreamer(const std::string &ref_file_name,
+                          const std::string &original_bam_file_name,
+                          const std::string &realigned_bam_file_name,
+                          const MapContigLoci loci,
+                          int min_baseQ,
+                          int min_mapQ,
+                          bool filter_edit_distance)
+    : original(ref_file_name, original_bam_file_name, loci, min_baseQ, min_mapQ, filter_edit_distance),
+      realigned(ref_file_name, realigned_bam_file_name, loci, min_baseQ, min_mapQ, filter_edit_distance)
+{}
+
+std::vector<Read> PairedBamStreamer::get_column(std::string &ret_contig, int &ret_pos) {
+    std::string contig = "";
+    int pos;
+    std::vector<Read> orig_col = original.get_column(ret_contig, ret_pos);
+    std::vector<Read> realign_col = realigned.get_column(contig, pos);
+    if (realign_col.size() == 0) {
+        return orig_col;
+    } else {
+        for (const auto &realigned_read : realign_col) {
+            bool is_new = true;
+            for (auto &&original_read : orig_col) {
+                if (original_read.name == realigned_read.name) {
+                    original_read.base = realigned_read.base;
+                    original_read.qual = realigned_read.qual;
+                    is_new = false;
+                    break;
+                }
+            }
+            if (is_new) {
+                orig_col.push_back(realigned_read);
+            }
+        }
+    }
+    return orig_col;
+}
+
+MultiBamStreamer::MultiBamStreamer(std::string ref_file_name, const std::vector<std::string> &bam_file_names,
+                         const std::vector<std::string> &realigned_file_names,
+                         const MapContigLoci &loci, int min_baseQ, int min_mapQ, bool filter_edit_distance)
+    : num_samples(bam_file_names.size()),
+      min_base_qual(min_baseQ),
+      min_map_qual(min_mapQ),
+      reference(std::move(ref_file_name)),
+      loci(loci),
+      is_filter_edit_distance(filter_edit_distance) {
+    // ref_fp = fai_load(reference.c_str());
+    ref_fp = fai_load3(reference.c_str(), (reference + ".fai").c_str(), nullptr, 0x0);
+    if (ref_fp == nullptr) {
+        std::cerr << "Error: Failed to open reference file " << reference << std::endl;
+    }
+    streams.reserve(num_samples);
+    assert(bam_file_names.size() == realigned_file_names.size());
+    for (int idx = 0; idx < bam_file_names.size(); idx++) {
+        streams.emplace_back(ref_file_name,
+                             bam_file_names[idx],
+                             realigned_file_names[idx],
+                             loci,
+                             min_baseQ,
+                             min_mapQ,
+                             filter_edit_distance);
+    }
+}
+
+MultiBamStreamer::~MultiBamStreamer() {
+    fai_destroy(ref_fp);
+}
+
+// TODO: do this contig-wise, make sure all samples are in the same contig simultaneously
+Pileups MultiBamStreamer::get_column() {
+    Pileups read_col(num_samples);
+    bool not_found = true;
+    std::string contig = "";
+    int pos;
+    /*!
+     * \details For each sample, get reads until the first active locus in the queue is finished,
+     * then emplace in the output vector
+     */
+    for (int j = 0; j < num_samples; ++j) {
+        read_col.emplace_read_column(streams[j].get_column(contig, pos));
+
+        if (not_found && contig.length() > 0) {
+            int len_seq;
+            char *temp = faidx_fetch_seq(ref_fp, contig.c_str(), pos, pos, &len_seq);
+            if (temp != nullptr) {
+                read_col.set_ref(temp[0]);
+                free(temp);
+            } else {
+                std::cerr << "Error BamStreamer::get_column: reference error." << std::endl;
+                exit(EXIT_FAILURE);
+            }
+            not_found = false;
+        }
+    }
     return read_col;
 }
 
@@ -286,7 +355,7 @@ std::string uint2str(const uint8_t *seq, int len) {
     return temp;
 }
 
-int BamStreamer::print_pileup_seq(const bam_pileup1_t *p, int n) {
+int MultiBamStreamer::print_pileup_seq(const bam_pileup1_t *p, int n) {
     for (int i = 0; i < n; ++i, ++p) {
         uint8_t *seq = bam_get_seq(p->b);
 //            std::string temp = uint2str(seq, p->b->core.l_qseq);

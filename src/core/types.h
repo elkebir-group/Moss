@@ -101,11 +101,19 @@ namespace moss {
     }
 
 
-    typedef struct {
+    struct Read{
         uint8_t base;
         int qual;
         bool is_reverse_strand;
-    } Read;
+        std::string name;
+
+        Read(uint8_t base, int qual, bool is_reverse, std::string name)
+            : base(base),
+              qual(qual),
+              is_reverse_strand(is_reverse),
+              name(name)
+        {}
+    };
 
     class Pileups {
     private:

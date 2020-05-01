@@ -185,8 +185,6 @@ VcfWriter::VcfWriter(const std::string &filename, const MapContigLoci &loci, uns
     bcf_hdr_append(header,
                    "##INFO=<ID=SGT,Number=1,Type=String,Description=\"Most likely somatic genotype\">");
     bcf_hdr_append(header,
-                   "##INFO=<ID=PASSBASE,Number=0,Type=Flag,Description=\"Pass the base caller in at least 1 sample\">");
-    bcf_hdr_append(header,
                    "##INFO=<ID=NUMPASS,Number=1,Type=Integer,Description=\"Number of samples that pass the base caller\">");
     ref_idx = fai_load(ref_file.c_str());
     for (const auto &contig : loci) {
@@ -211,12 +209,12 @@ VcfWriter::VcfWriter(const std::string &filename, const MapContigLoci &loci, uns
         if (read_group_pos != std::string::npos) {
             auto sample_pos = header_text.find("SM:", read_group_pos);
             if (sample_pos != std::string::npos) {
-                auto sample_end = header_text.find('\t', sample_pos);
+                auto sample_end = header_text.find_first_of("\t\n", sample_pos);
                 name = header_text.substr(sample_pos + 3, sample_end - sample_pos - 3);
             } else {
                 auto id_pos = header_text.find("ID:", read_group_pos);
                 if (id_pos != std::string::npos) {
-                    auto id_end = header_text.find('\t', id_pos);
+                    auto id_end = header_text.find_first_of("\t\n", id_pos);
                     name = header_text.substr(id_pos + 3, id_end - id_pos - 3);
                 }
             }
@@ -312,9 +310,6 @@ VcfWriter::write_record(std::string chrom, std::pair<const locus_t, Aggregate> c
     bcf_update_format_int32(header, rec, "Z", Z.data(), num_samples);
     bcf_update_format_float(header, rec, "ZQ", zq.data(), num_samples);
     bcf_update_info_float(header, rec, "TIN", &annos.log_t_in_normal, 1);
-    if (consensus.second.is_pass) {
-        bcf_update_info_flag(header, rec, "PASSBASE", NULL, 1);
-    }
     bcf_update_info_int32(header, rec, "NUMPASS", &consensus.second.num_pass, 1);
     std::vector<float> SOR(num_samples);
     for (int i = 0; i < num_samples; i++) {

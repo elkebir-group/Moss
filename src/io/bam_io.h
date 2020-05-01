@@ -40,31 +40,73 @@ namespace moss {
 
     class BamStreamer {
     private:
+        const int min_base_qual;
+        const int min_map_qual;
+        const MapContigLoci loci;                           //!< candidate positions
+        data_t **meta;
+        std::vector<hts_reglist_t> region;    //!< regions of interest for sam_itr_regions
+        std::pair<locus_t, locus_t> window;   //!< sliding windows for each sample
+        int tid;                              //!< current hts tid (current chrom) for each sample
+        std::map<locus_t, Aggregate>::const_iterator iter;  //!< iterator point to loci
+        std::deque<locus_t> actives;           //!< active loci for each sample
+        Buffer buffer;
+        bool is_filter_edit_distance;
+        const static uint16_t FAIL_FLAGS = BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP;
+    public:
+        explicit BamStreamer(const std::string &ref_file_name,
+                             const std::string &bam_file_name,
+                             const MapContigLoci loci,
+                             int min_baseQ,
+                             int min_mapQ,
+                             bool filter_edit_distance);
+
+        // BamStreamer(const BamStreamer &other);
+        
+        virtual ~BamStreamer();
+
+        std::vector<Read> get_column(std::string &ret_contig, int &ret_pos);
+    };
+
+
+    class PairedBamStreamer {
+    private:
+        BamStreamer original;
+        BamStreamer realigned;
+    public:
+        PairedBamStreamer(const std::string &ref_file_name,
+                          const std::string &original_bam_file_name,
+                          const std::string &realigned_bam_file_name,
+                          const MapContigLoci loci,
+                          int min_baseQ,
+                          int min_mapQ,
+                          bool filter_edit_distance);
+
+        std::vector<Read> get_column(std::string &ret_contig, int &ret_pos);
+    };
+
+
+    class MultiBamStreamer {
+    private:
         const unsigned long num_samples;
-        std::vector<data_t **> meta;
         const int min_base_qual;
         const int min_map_qual;
         const std::string reference;
         faidx_t *ref_fp;
         const MapContigLoci loci;                           //!< candidate positions
-        std::vector<std::vector<hts_reglist_t>> regions;    //!< regions of interest for sam_itr_regions
-        std::vector<std::pair<locus_t, locus_t>> windows;   //!< sliding windows for each sample
-        std::vector<int> tids;                              //!< current hts tid (current chrom) for each sample
-        std::vector<std::map<locus_t, Aggregate>::const_iterator> iters;  //!< iterator point to loci
-        std::vector<std::deque<locus_t>> actives;           //!< active loci for each sample
-        std::vector<Buffer> buffers;                        //!< buffer for Pileups in building
+        std::vector<PairedBamStreamer> streams;                   //!< single bam file
         const static uint16_t FAIL_FLAGS = BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP;
         bool is_filter_edit_distance;
 
     public:
-        explicit BamStreamer(std::string ref_file_name,
+        explicit MultiBamStreamer(std::string ref_file_name,
                              const std::vector<std::string> &bam_file_names,
+                             const std::vector<std::string> &realigned_file_names,
                              const MapContigLoci &loci,
                              int min_baseQ = 13,
                              int min_mapQ = 30,
                              bool filter_edit_distance = false);
 
-        virtual ~BamStreamer();
+        virtual ~MultiBamStreamer();
 
         Pileups get_column();
 

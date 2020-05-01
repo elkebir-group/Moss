@@ -22,6 +22,7 @@ struct Flags {
 const option long_options[] =
     {
         {"bam",                 required_argument, nullptr,   'b'},
+        {"realigned",           required_argument, nullptr,   'R'},
         {"ref",                 required_argument, nullptr,   'r'},
         {"output",              required_argument, nullptr,   'o'},
         {"normal",              required_argument, nullptr,   'n'},
@@ -49,8 +50,10 @@ void print_help() {
               "       -n <germline VCF> -v <candidate VCF> -o <output VCF>\n"
               "\n"
               "Compulsary arguments:\n"
-              "  -b, --bam <BAM>        a pair of original and realigned BAM files for\n"
-              "                         one sample, can be addressed multiple times\n"
+              "  -b, --bam <BAM>        original BAM files for one sample,\n"
+              "                         can be addressed multiple times\n"
+              "  -R, --realigned <BAM>  realigned BAM files for one sample,\n"
+              "                         can be addressed multiple times\n"
               "  -r, --ref <FASTA>      reference FASTA file\n"
               "  -o, --output <OUT>     output VCF file\n"
               "  -n, --normal <NORMAL>  normal sample's germline VCF result\n"
@@ -85,7 +88,7 @@ bool is_file_exist(const std::string &name) {
 
 int main(int argc, char **argv) {
     int c;
-    const char *const short_opts = "b:r:o:n:l:v:t:m:B:M:d:h";
+    const char *const short_opts = "b:R:r:o:n:l:v:t:m:B:M:d:h";
 
 
     // variables
@@ -93,6 +96,7 @@ int main(int argc, char **argv) {
     std::string normal_vcf;
     std::string out_vcf;
     std::vector<std::string> bam_files;
+    std::vector<std::string> realigned_bam_files;
     std::vector<std::string> bam_idx;
     std::vector<std::string> loci_files;
     std::vector<std::string> tumor_vcfs;
@@ -127,6 +131,10 @@ int main(int argc, char **argv) {
 
             case 'b':
                 bam_files.emplace_back(std::string(optarg));
+                break;
+
+            case 'R':
+                realigned_bam_files.emplace_back(std::string(optarg));
                 break;
 
             case 'r':
@@ -200,7 +208,22 @@ int main(int argc, char **argv) {
         std::cout << "# Reference FASTA file: " << ref_file << std::endl;
     }
     std::cout << "# BAM files:\t";
+    if (bam_files.size() != realigned_bam_files.size()) {
+        std::cerr << "\nError: Original and realigned BAM files not paired " << std::endl;
+            return 1;
+    }
     for (const std::string &bamFile : bam_files) {
+        std::string indexFile = bamFile + ".bai";
+        if (!is_file_exist(bamFile)) {
+            std::cerr << "Error: Failed to open BAM file " << bamFile << std::endl;
+            return 1;
+        } else if (!is_file_exist(indexFile)) {
+            std::cerr << "Error: Failed to open index file " << indexFile << std::endl;
+            return 1;
+        }
+        std::cout << bamFile << '\t';
+    }
+    for (const std::string &bamFile : realigned_bam_files) {
         std::string indexFile = bamFile + ".bai";
         if (!is_file_exist(bamFile)) {
             std::cerr << "Error: Failed to open BAM file " << bamFile << std::endl;
@@ -280,7 +303,7 @@ int main(int argc, char **argv) {
     std::cout << "# Start time: " << std::put_time(std::localtime(&now), "%FT%T%z") << std::endl;
     for (const auto &chrom : loci) {
         start = std::chrono::system_clock::now();
-        moss::BamStreamer streamer(ref_file, bam_files, moss::MapContigLoci{{chrom.first, chrom.second}}, min_base_qual, min_mapping_qual);
+        moss::MultiBamStreamer streamer(ref_file, bam_files, realigned_bam_files, moss::MapContigLoci{{chrom.first, chrom.second}}, min_base_qual, min_mapping_qual);
         end = std::chrono::system_clock::now();
         elapsed_seconds = end - start;
         std::cout << "# Streamer elapsed time: " << elapsed_seconds.count() << std::endl;
