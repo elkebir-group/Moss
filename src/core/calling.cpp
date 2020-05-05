@@ -14,7 +14,7 @@ using namespace moss;
 SnvCaller::SnvCaller(int n_tumor_sample, const std::string& normal, bool is_ignore0, double mu, int max_depth,
                      int grid_size)
     : n_tumor_sample(n_tumor_sample),
-      normal_result(VcfReader(normal)),
+      normal_result(VcfReader<RecData>(normal)),
       mu(mu),
       max_depth(max_depth),
       gridSize(grid_size),

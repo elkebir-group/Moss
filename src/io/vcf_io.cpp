@@ -36,7 +36,11 @@ const unsigned char seq_nt16_table[256] = {
     15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15
 };
 
-VcfReader::VcfReader(const std::string &filename) : filename(filename) {
+template class VcfReader<RecData>;
+template class VcfReader<LociRecData>;
+
+template<>
+VcfReader<RecData>::VcfReader(const std::string &filename) : filename(filename) {
     if (!filename.empty()) {
         hFILE *fp = hopen(filename.c_str(), "r");
         htsFormat format;
@@ -100,23 +104,79 @@ VcfReader::VcfReader(const std::string &filename) : filename(filename) {
     }
 }
 
-VcfReader::~VcfReader() = default;
+template<>
+VcfReader<LociRecData>::VcfReader(const std::string &filename) : filename(filename) {
+    if (!filename.empty()) {
+        hFILE *fp = hopen(filename.c_str(), "r");
+        htsFormat format;
+        hts_detect_format(fp, &format);
+        hclose(fp);
+        bcf_hdr_t *header;
+        bcf1_t *rec;
+        htsFile *ifile;
+        ifile = bcf_open(filename.c_str(), get_mode(&format).c_str());
+        if (ifile != nullptr) {
+            header = bcf_hdr_read(ifile);
+            bcf1_t *rec = bcf_init();
+            int ngt,
+                *gt = nullptr,
+                ngt_arr = 0;
+            uint8_t normal_gt;
+            while (bcf_read(ifile, header, rec) == 0) {
+                if (bcf_is_snp(rec)) {
+                    const char *contig = bcf_hdr_id2name(header, rec->rid);
+                    int *num_pass = nullptr;
+                    int n_num_pass = 0;
+                    int ret = bcf_get_info_int32(header, rec, "NUMPASS", &num_pass, &n_num_pass);
+                    if (ret < 0) {
+                        num_pass = new int(0);
+                    }
+                    auto search = records.find(contig);
+                    if (search != records.end()) {
+                        search->second.emplace(std::make_pair(rec->pos, LociRecData{*num_pass}));
+                    } else {
+                        records.emplace(std::make_pair(contig,
+                                                       std::map<locus_t, LociRecData>{{rec->pos, LociRecData{*num_pass}}}));
+                    }
+                    free(num_pass);
+                } else {
+                    continue;
+                }
+            }
+            if (rec != nullptr) {
+                bcf_destroy(rec);
+            }
+            if (ngt >= 0) {
+                free(gt);
+            }
+            bcf_close(ifile);
+            bcf_hdr_destroy(header);
+        } else {
+            exit(1);
+        }
+    }
+}
 
-RecData VcfReader::find(const std::string &contig, locus_t pos) {
+template<typename T>
+VcfReader<T>::~VcfReader() = default;
+
+template<typename T>
+T VcfReader<T>::find(const std::string &contig, locus_t pos) {
     auto search_contig = records.find(contig);
     if (search_contig != records.end()) {
         auto search_pos = search_contig->second.find(pos);
         if (search_pos != search_contig->second.end()) {
             return search_pos->second;
         } else {
-            return RecData{BaseSet(0xff), false};
+            return T();
         }
     } else {
-        return RecData{BaseSet(0xff), false};
+        return T();
     }
 }
 
-std::string VcfReader::get_mode(htsFormat *format) {
+template<typename T>
+std::string VcfReader<T>::get_mode(htsFormat *format) {
     switch (format->format) {
         case bcf:
             return "rb";
@@ -138,11 +198,13 @@ std::string VcfReader::get_mode(htsFormat *format) {
     }
 }
 
-const std::map<std::string, std::map<locus_t, RecData>> &VcfReader::get_records() const {
+template<typename T>
+const std::map<std::string, std::map<locus_t, T>> &VcfReader<T>::get_records() const {
     return records;
 }
 
-bool VcfReader::empty() {
+template<typename T>
+bool VcfReader<T>::empty() {
     return filename.empty();
 }
 

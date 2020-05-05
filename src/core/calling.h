@@ -56,7 +56,7 @@ namespace moss {
 
     class SnvCaller {
     private:
-        VcfReader normal_result;
+        VcfReader<RecData> normal_result;
         int n_tumor_sample,
             gridSize,
             max_depth;

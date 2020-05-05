@@ -16,17 +16,26 @@
 namespace moss {
     using filter_t = uint32_t;
 
-    struct _RecData {
+    struct RecData {
         BaseSet bases;
         bool is_pass;
+
+        RecData() : bases(BaseSet(0xff)), is_pass(false) {};
+        RecData(BaseSet bases, bool is_pass) : bases(bases), is_pass(is_pass) {};
     };
 
-    using RecData = _RecData;
+    struct LociRecData {
+        int num_pass;
 
+        LociRecData() : num_pass(-1) {};
+        LociRecData(int num_pass) : num_pass(num_pass) {};
+    };
+
+    template<typename T>
     class VcfReader {
     private:
         std::string filename;
-        std::map<std::string, std::map<locus_t, RecData>> records;
+        std::map<std::string, std::map<locus_t, T>> records;
 
         static std::string get_mode(htsFormat *format);
 
@@ -35,9 +44,9 @@ namespace moss {
 
         ~VcfReader();
 
-        RecData find(const std::string &contig, locus_t pos);
+        T find(const std::string &contig, locus_t pos);
 
-        const std::map<std::string, std::map<locus_t, RecData>> &get_records() const;
+        const std::map<std::string, std::map<locus_t, T>> &get_records() const;
 
         bool empty();
     };

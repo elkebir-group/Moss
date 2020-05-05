@@ -10,7 +10,7 @@
 #include "../core/types.h"
 
 namespace moss {
-    MapContigLoci merge_loci(std::vector<std::string> filenames);
+    MapContigLoci import_loci(std::string filename);
     MapContigLoci merge_vcf(std::vector<std::string> filenames);
 }
 
