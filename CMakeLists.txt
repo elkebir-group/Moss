@@ -12,7 +12,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/build/cmake/modu
 find_package(HTSlib 1.4 REQUIRED)
 
 set(OBJ
-    src/main.cpp
+    src/moss.cpp
     src/io/bam_io.cpp
     src/io/bam_io.h
     src/io/vcf_io.h
