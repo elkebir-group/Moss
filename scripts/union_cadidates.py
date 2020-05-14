@@ -39,8 +39,7 @@ def strelka2(inputs) -> dict:
 
             if chrom in chrom_pos_gt:
                 if pos in chrom_pos_gt[chrom]:
-                    num_pass += chrom_pos_gt[chrom][pos]["num_pass"]
-                    chrom_pos_gt[chrom][pos]["num_pass"] = num_pass
+                    chrom_pos_gt[chrom][pos]["num_pass"] += num_pass
                     if chrom_pos_gt[chrom][pos]["gt"][0] == chrom_pos_gt[chrom][pos]["gt"][1] and normal[0] != normal[1]:
                         chrom_pos_gt[chrom][pos]["gt"] = normal
                         cnt += 1
@@ -65,10 +64,12 @@ def mutect2(inputs, normal_name) -> dict:
             in_vcf["variants/POS"][in_vcf["variants/is_snp"]],
             in_vcf["variants/REF"][in_vcf["variants/is_snp"]],
             in_vcf["variants/ALT"][in_vcf["variants/is_snp"]],
-            in_vcf["calldata/GT"][in_vcf["variants/is_snp"]])
-        for chrom, pos, ref, alt, gt in zipped:
+            in_vcf["calldata/GT"][in_vcf["variants/is_snp"]],
+            in_vcf["variants/FILTER_PASS"][in_vcf["variants/is_snp"]])
+        for chrom, pos, ref, alt, gt, is_pass in zipped:
             chrom = str(chrom)
             pos = int(pos)
+            num_pass = int(is_pass)
             alt = alt[0]
             ref_alt = ref + alt
             normal = ref_alt[gt[idx_normal][0]] + ref_alt[gt[idx_normal][1]]
@@ -77,13 +78,14 @@ def mutect2(inputs, normal_name) -> dict:
 
             if chrom in chrom_pos_gt:
                 if pos in chrom_pos_gt[chrom]:
-                    if chrom_pos_gt[chrom][pos][0] == chrom_pos_gt[chrom][pos][1] and normal[0] != normal[1]:
+                    chrom_pos_gt[chrom][pos]["num_pass"] += num_pass
+                    if chrom_pos_gt[chrom][pos]["gt"][0] == chrom_pos_gt[chrom][pos]["gt"][1] and normal[0] != normal[1]:
                         cnt += 1
-                        chrom_pos_gt[chrom][pos] = normal
+                        chrom_pos_gt[chrom][pos]["gt"] = normal
                 else:
-                    chrom_pos_gt[chrom][pos] = normal
+                    chrom_pos_gt[chrom][pos] = {"gt": normal, "num_pass": num_pass}
             else:
-                chrom_pos_gt[chrom] = {pos: normal}
+                chrom_pos_gt[chrom] = {pos: {"gt": normal, "num_pass": num_pass}}
     print(f"Disagreement on normal: {cnt} times.")
     print(f"Not ref: {cnt_het_hom} times.")
     return chrom_pos_gt

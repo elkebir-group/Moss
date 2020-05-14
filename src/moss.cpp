@@ -1,8 +1,8 @@
 #include <iostream>
+#include <sstream>
 #include <getopt.h>
 #include <vector>
 #include <sys/stat.h>
-#include <bitset>
 #include "io/bam_io.h"
 #include "io/loci.h"
 #include "core/calling.h"
@@ -17,6 +17,7 @@ struct Flags {
     int filter_total = 0;
     int filter_vaf = 0;
     int ignore0 = 0;
+    int pileup = 0;
 } flags;
 
 const option long_options[] =
@@ -35,9 +36,10 @@ const option long_options[] =
         {"min-mapping-qual",    required_argument, nullptr,   'M'},
         {"grid-size",           required_argument, nullptr,   'g'},
         {"filter-total",         no_argument,       &flags.filter_total, 1},
-        {"filter-vaf",           no_argument,       &flags.filter_vaf, 1},
-        {"ignore0",             no_argument,       &flags.ignore0, 1},
-        {"dry",                 no_argument,       &flags.dry,  1},
+        {"filter-vaf",           no_argument,       &flags.filter_vaf,   1},
+        {"ignore0",             no_argument,       &flags.ignore0,     1},
+        {"dry",                 no_argument,       &flags.dry,         1},
+        {"pileup",              no_argument,       &flags.pileup,      1},
         {nullptr,               no_argument,       nullptr,   0}
     };
 
@@ -76,7 +78,8 @@ void print_help() {
               "  --dry                  set to dry run\n"
               "  --filter-total          set to filter variants with total tumor depth < 150\n"
               "  --filter-vaf            set to filter variants with VAF in any samples < 0.1\n"
-              "  --ignore0              ignore samples with ref allele in all reads\n";
+              "  --ignore0              ignore samples with ref allele in all reads\n"
+              "  --pileup               output pileup, only effective in dry-run mode \n";
     exit(1);
 }
 
@@ -235,11 +238,13 @@ int main(int argc, char **argv) {
         std::cout << bamFile << '\t';
     }
     std::cout << std::endl << "# Loci file:\t";
-    if (!is_file_exist(loci_file)) {
-        std::cerr << "Error: Failed to open loci file " << loci_file << std::endl;
-        return 1;
-    } else {
-        std::cout << loci_file << '\t';
+    if (!loci_file.empty()) {
+        if (!is_file_exist(loci_file)) {
+            std::cerr << "Error: Failed to open loci file " << loci_file << std::endl;
+            return 1;
+        } else {
+            std::cout << loci_file << '\t';
+        }
     }
     std::cout << std::endl << "# Input VCF files:\t";
     if (!normal_vcf.empty()) {
@@ -307,7 +312,22 @@ int main(int argc, char **argv) {
         std::cout << "# Streamer elapsed time: " << elapsed_seconds.count() << std::endl;
         for (const auto &l : chrom.second) {
             moss::Pileups col = streamer.get_column();
-            if (flags.dry == 0) {
+            if (flags.dry == 1) {
+                if (flags.pileup == 1) {
+                    std::cout << "Columns:" << std::endl;
+                    for (const auto &sample : col.get_read_columns()) {
+                        std::cout << "Locus:\t" << chrom.first << '\t' << l.first+1 << '\t' << col.get_ref() << '\t'
+                                << sample.size() << std::endl;
+                        std::ostringstream bases, quals;
+                        for (const auto &read : sample) {
+                            bases << seq_nt16_str[read.base] << '\t';
+                            quals << read.qual << '\t';
+                        }
+                        std::cout << bases.str() << std::endl;
+                        std::cout << quals.str() << std::endl;
+                    }
+                }
+            } else {
                 // TODO: baseset
                 start = std::chrono::system_clock::now();
                 auto log_proba_non_soma = caller.calling(chrom.first, l.first, col, anno);
@@ -326,7 +346,6 @@ int main(int argc, char **argv) {
                     }
                     std::cout << std::endl;
                 }
-
             }
         }
     }
