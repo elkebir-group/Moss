@@ -35,16 +35,15 @@ TEST_CASE("CIGAR resolving", "[bam]") {
     std::memcpy(bam_get_seq(&b), seq, sizeof(seq));
     std::memset(bam_get_qual(&b), 40, b.core.l_qseq);
 
-    cstate_t c{-1, 0, 0, 0};
     PileupMeta p{};
-    resolve_cigar2(&b, 39, &c, &p);
+    resolve_cigar(&b, 39, &p);
     REQUIRE(p.qpos == 10);
-    resolve_cigar2(&b, 20, &c, &p);
+    resolve_cigar(&b, 20, &p);
     REQUIRE(p.qpos == 5);
-    resolve_cigar2(&b, 24, &c, &p);
+    resolve_cigar(&b, 24, &p);
     REQUIRE(p.is_refskip == 1);
-    resolve_cigar2(&b, 35, &c, &p);
+    resolve_cigar(&b, 35, &p);
     REQUIRE(p.qpos == 6);
-    resolve_cigar2(&b, 39, &c, &p);
+    resolve_cigar(&b, 39, &p);
     REQUIRE(p.qpos == 10);
 }
