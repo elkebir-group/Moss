@@ -65,8 +65,8 @@ python scripts/union_candidates.py -f <list_of_VCF.list> --normal-name <NORMAL> 
 ```
 
 To run Moss, you need a reference genome FASTA file, BAM files for normal and tumor samples, realigned BAM files (optional but recommended), and a candidate loci VCF.
+For example, after you've built `moss` in the `build/` directory, you can run the toy example in `data/`:
 
 ``` bash
-moss [options] -r <reference> -b <normal BAM> -b <tumor BAM>
-       -n <germline VCF> -l <candidate VCF> -o <output VCF>
+./moss -r ../data/demo20.fa -b ../data/normal.sort.bam -R ../data/empty.bam -b ../data/clone0.spike.sort.bam -R ../data/empty.bam -b ../data/clone1.spike.sort.bam -R ../data/empty.bam -b ../data/clone2.spike.sort.bam -R ../data/empty.bam -b ../data/clone3.spike.sort.bam -R ../data/empty.bam -l ../data/candidates.chrdemo20.vcf -m 4 -t -0.693 --ignore0 --grid-size 200 -o example.vcf
 ```
