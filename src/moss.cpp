@@ -22,25 +22,25 @@ struct Flags {
 
 const option long_options[] =
     {
-        {"bam",                 required_argument, nullptr,   'b'},
-        {"realigned",           required_argument, nullptr,   'R'},
-        {"ref",                 required_argument, nullptr,   'r'},
-        {"output",              required_argument, nullptr,   'o'},
-        {"normal",              required_argument, nullptr,   'n'},
-        {"loci",                required_argument, nullptr,   'l'},
-        {"vcf",                 required_argument, nullptr,   'v'},
-        {"tau",                 required_argument, nullptr,   't'},
-        {"mu",                  required_argument, nullptr,   'm'},
-        {"max_dep",             required_argument, nullptr,   'd'},
-        {"min-base-qual",       required_argument, nullptr,   'B'},
-        {"min-mapping-qual",    required_argument, nullptr,   'M'},
-        {"grid-size",           required_argument, nullptr,   'g'},
-        {"filter-total",         no_argument,       &flags.filter_total, 1},
-        {"filter-vaf",           no_argument,       &flags.filter_vaf,   1},
-        {"ignore0",             no_argument,       &flags.ignore0,     1},
-        {"dry",                 no_argument,       &flags.dry,         1},
-        {"pileup",              no_argument,       &flags.pileup,      1},
-        {nullptr,               no_argument,       nullptr,   0}
+        {"bam",              required_argument, nullptr,             'b'},
+        {"realigned",        required_argument, nullptr,             'R'},
+        {"ref",              required_argument, nullptr,             'r'},
+        {"output",           required_argument, nullptr,             'o'},
+        {"normal",           required_argument, nullptr,             'n'},
+        {"loci",             required_argument, nullptr,             'l'},
+        {"vcf",              required_argument, nullptr,             'v'},
+        {"tau",              required_argument, nullptr,             't'},
+        {"mu",               required_argument, nullptr,             'm'},
+        {"max_dep",          required_argument, nullptr,             'd'},
+        {"min-base-qual",    required_argument, nullptr,             'B'},
+        {"min-mapping-qual", required_argument, nullptr,             'M'},
+        {"grid-size",        required_argument, nullptr,             'g'},
+        {"filter-total",     no_argument,       &flags.filter_total, 1},
+        {"filter-vaf",       no_argument,       &flags.filter_vaf,   1},
+        {"ignore0",          no_argument,       &flags.ignore0,      1},
+        {"dry",              no_argument,       &flags.dry,          1},
+        {"pileup",           no_argument,       &flags.pileup,       1},
+        {nullptr,            no_argument,       nullptr,             0}
     };
 
 void print_help() {
@@ -213,7 +213,7 @@ int main(int argc, char **argv) {
     std::cout << "# BAM files:\t";
     if (bam_files.size() != realigned_bam_files.size()) {
         std::cerr << "\nError: Original and realigned BAM files not paired " << std::endl;
-            return 1;
+        return 1;
     }
     for (const std::string &bamFile : bam_files) {
         std::string indexFile = bamFile + ".bai";
@@ -290,7 +290,7 @@ int main(int argc, char **argv) {
     }
     std::cout << "# Loci merged" << std::endl;
     auto start = std::chrono::system_clock::now();
-    moss::SnvCaller caller(num_tumor_samples, normal_vcf, flags.ignore0, mu, max_depth, grid_size+1);
+    moss::SnvCaller caller(num_tumor_samples, normal_vcf, flags.ignore0, mu, max_depth, grid_size + 1);
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     std::chrono::duration<double> calling_time{0};
@@ -298,7 +298,8 @@ int main(int argc, char **argv) {
     std::cout << "## Chrom\tPos \t Prob \t Alt \t Genotype:TumorCount:Coverage" << std::endl;
     moss::Annotation anno(num_samples);
     start = std::chrono::system_clock::now();
-    moss::VcfWriter writer{out_vcf, loci, num_tumor_samples, ref_file, bam_files, flags.filter_total, flags.filter_vaf, tau};
+    moss::VcfWriter writer{out_vcf, loci, num_tumor_samples, ref_file, bam_files, static_cast<bool>(flags.filter_total),
+                           static_cast<bool>(flags.filter_vaf), tau};
     end = std::chrono::system_clock::now();
     elapsed_seconds = end - start;
     std::cout << "# Writer elapsed time: " << elapsed_seconds.count() << std::endl;
@@ -306,7 +307,9 @@ int main(int argc, char **argv) {
     std::cout << "# Start time: " << std::put_time(std::localtime(&now), "%FT%T%z") << std::endl;
     for (const auto &chrom : loci) {
         start = std::chrono::system_clock::now();
-        moss::MultiBamStreamer streamer(ref_file, bam_files, realigned_bam_files, moss::MapContigLoci{{chrom.first, chrom.second}}, min_base_qual, min_mapping_qual);
+        moss::MultiBamStreamer streamer(ref_file, bam_files, realigned_bam_files,
+                                        moss::MapContigLoci{{chrom.first, chrom.second}}, min_base_qual,
+                                        min_mapping_qual);
         end = std::chrono::system_clock::now();
         elapsed_seconds = end - start;
         std::cout << "# Streamer elapsed time: " << elapsed_seconds.count() << std::endl;
@@ -316,8 +319,8 @@ int main(int argc, char **argv) {
                 if (flags.pileup == 1) {
                     std::cout << "Columns:" << std::endl;
                     for (const auto &sample : col.get_read_columns()) {
-                        std::cout << "Locus:\t" << chrom.first << '\t' << l.first+1 << '\t' << col.get_ref() << '\t'
-                                << sample.size() << std::endl;
+                        std::cout << "Locus:\t" << chrom.first << '\t' << l.first + 1 << '\t' << col.get_ref() << '\t'
+                                  << sample.size() << std::endl;
                         std::ostringstream bases, quals;
                         for (const auto &read : sample) {
                             bases << seq_nt16_str[read.base] << '\t';

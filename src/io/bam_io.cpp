@@ -115,6 +115,16 @@ BamStreamer::BamStreamer(const std::string &ref_file_name,
             max = l.first + 1 > max ? l.first + 1 : max;
             idx_loc++;
         }
+#if HTS_VERSION >= 101000
+        hts_reglist_t list{
+            reg,
+            intervals,
+            bam_name2id(meta[0]->header, contig.first.c_str()),
+            static_cast<uint32_t>(contig.second.size()),
+            min,
+            max
+        };
+#else
         hts_reglist_t list{
             reg,
             bam_name2id(meta[0]->header, contig.first.c_str()),
@@ -123,6 +133,7 @@ BamStreamer::BamStreamer(const std::string &ref_file_name,
             min,
             max
         };
+#endif
         region.emplace_back(list);
     }
     if ((meta[0]->iter = sam_itr_regions(meta[0]->index, meta[0]->header, region.data(),

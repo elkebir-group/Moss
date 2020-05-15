@@ -5,7 +5,6 @@
 #include <utility>
 #include <fstream>
 #include <sstream>
-#include <htslib/hfile.h>
 #include <htslib/hts.h>
 #include <htslib/sam.h>
 #include <iomanip>
@@ -15,198 +14,6 @@
 #include "vcf_io.h"
 
 using namespace moss;
-
-const unsigned char seq_nt16_table[256] = {
-    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-    1, 2, 4, 8, 15, 15, 15, 15, 15, 15, 15, 15, 15, 0 /*=*/, 15, 15,
-    15, 1, 14, 2, 13, 15, 15, 4, 11, 15, 15, 12, 15, 3, 15, 15,
-    15, 15, 5, 6, 8, 15, 7, 9, 15, 10, 15, 15, 15, 15, 15, 15,
-    15, 1, 14, 2, 13, 15, 15, 4, 11, 15, 15, 12, 15, 3, 15, 15,
-    15, 15, 5, 6, 8, 15, 7, 9, 15, 10, 15, 15, 15, 15, 15, 15,
-
-    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15
-};
-
-template class VcfReader<RecData>;
-template class VcfReader<LociRecData>;
-
-template<>
-VcfReader<RecData>::VcfReader(const std::string &filename) : filename(filename) {
-    if (!filename.empty()) {
-        hFILE *fp = hopen(filename.c_str(), "r");
-        htsFormat format;
-        hts_detect_format(fp, &format);
-        hclose(fp);
-        bcf_hdr_t *header;
-        bcf1_t *rec;
-        htsFile *ifile;
-        ifile = bcf_open(filename.c_str(), get_mode(&format).c_str());
-        if (ifile != nullptr) {
-            header = bcf_hdr_read(ifile);
-            bcf1_t *rec = bcf_init();
-            int ngt,
-                *gt = nullptr,
-                ngt_arr = 0;
-            uint8_t normal_gt;
-            while (bcf_read(ifile, header, rec) == 0) {
-                if (bcf_is_snp(rec)) {
-                    const char *contig = bcf_hdr_id2name(header, rec->rid);
-                    ngt = bcf_get_format_int32(header, rec, "GT", &gt, &ngt_arr);
-                    if (ngt == 1 && gt[0] != 0) {
-                        normal_gt = seq_nt16_table[*rec->d.allele[0]];
-                        if (*rec->d.allele[bcf_gt_allele(gt[0])] != '*') {
-                            normal_gt |= seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[0])]];
-                        }
-                    } else if (ngt == 2 && gt[0] != 0) {
-                        normal_gt = 0;
-                        if (*rec->d.allele[bcf_gt_allele(gt[0])] != '*') {
-                            normal_gt |= seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[0])]];
-                        }
-                        if (*rec->d.allele[bcf_gt_allele(gt[1])] != '*') {
-                            normal_gt |= seq_nt16_table[*rec->d.allele[bcf_gt_allele(gt[1])]];
-                        }
-                    } else {
-                        normal_gt = 0xff_8;
-                    }
-                    bool is_rec_pass = bcf_has_filter(header, rec, "PASS");
-                    auto search = records.find(contig);
-                    if (search != records.end()) {
-                        search->second.emplace(std::make_pair(rec->pos, RecData{BaseSet{normal_gt}, is_rec_pass}));
-                    } else {
-                        records.emplace(std::make_pair(contig,
-                                                       std::map<locus_t, RecData>{{rec->pos, RecData{BaseSet{normal_gt},
-                                                                                                     is_rec_pass}}}));
-                    }
-                } else {
-                    continue;
-                }
-            }
-            if (rec != nullptr) {
-                bcf_destroy(rec);
-            }
-            if (ngt >= 0) {
-                free(gt);
-            }
-            bcf_close(ifile);
-            bcf_hdr_destroy(header);
-        } else {
-            exit(1);
-        }
-    }
-}
-
-template<>
-VcfReader<LociRecData>::VcfReader(const std::string &filename) : filename(filename) {
-    if (!filename.empty()) {
-        hFILE *fp = hopen(filename.c_str(), "r");
-        htsFormat format;
-        hts_detect_format(fp, &format);
-        hclose(fp);
-        bcf_hdr_t *header;
-        bcf1_t *rec;
-        htsFile *ifile;
-        ifile = bcf_open(filename.c_str(), get_mode(&format).c_str());
-        if (ifile != nullptr) {
-            header = bcf_hdr_read(ifile);
-            bcf1_t *rec = bcf_init();
-            int ngt,
-                *gt = nullptr,
-                ngt_arr = 0;
-            uint8_t normal_gt;
-            while (bcf_read(ifile, header, rec) == 0) {
-                if (bcf_is_snp(rec)) {
-                    const char *contig = bcf_hdr_id2name(header, rec->rid);
-                    int *num_pass = nullptr;
-                    int n_num_pass = 0;
-                    int ret = bcf_get_info_int32(header, rec, "NUMPASS", &num_pass, &n_num_pass);
-                    if (ret < 0) {
-                        num_pass = new int(0);
-                    }
-                    auto search = records.find(contig);
-                    if (search != records.end()) {
-                        search->second.emplace(std::make_pair(rec->pos, LociRecData{*num_pass}));
-                    } else {
-                        records.emplace(std::make_pair(contig,
-                                                       std::map<locus_t, LociRecData>{{rec->pos, LociRecData{*num_pass}}}));
-                    }
-                    free(num_pass);
-                } else {
-                    continue;
-                }
-            }
-            if (rec != nullptr) {
-                bcf_destroy(rec);
-            }
-            if (ngt >= 0) {
-                free(gt);
-            }
-            bcf_close(ifile);
-            bcf_hdr_destroy(header);
-        } else {
-            exit(1);
-        }
-    }
-}
-
-template<typename T>
-VcfReader<T>::~VcfReader() = default;
-
-template<typename T>
-T VcfReader<T>::find(const std::string &contig, locus_t pos) {
-    auto search_contig = records.find(contig);
-    if (search_contig != records.end()) {
-        auto search_pos = search_contig->second.find(pos);
-        if (search_pos != search_contig->second.end()) {
-            return search_pos->second;
-        } else {
-            return T();
-        }
-    } else {
-        return T();
-    }
-}
-
-template<typename T>
-std::string VcfReader<T>::get_mode(htsFormat *format) {
-    switch (format->format) {
-        case bcf:
-            return "rb";
-            break;
-
-        case vcf:
-            if (format->compression == gzip) {
-                return "rz";
-            } else if (format->compression == no_compression) {
-                return "r";
-            } else {
-                return "r";
-            }
-            break;
-
-        default:
-            return "r";
-            break;
-    }
-}
-
-template<typename T>
-const std::map<std::string, std::map<locus_t, T>> &VcfReader<T>::get_records() const {
-    return records;
-}
-
-template<typename T>
-bool VcfReader<T>::empty() {
-    return filename.empty();
-}
 
 VcfWriter::VcfWriter(const std::string &filename, const MapContigLoci &loci, unsigned long num_tumor_samples,
                      std::string ref_file, const std::vector<std::string> &bam_files, bool filter_total_dp, bool filter_vaf, float qual_thr)
@@ -385,7 +192,7 @@ VcfWriter::write_record(std::string chrom, std::pair<const locus_t, Aggregate> c
     bcf_update_format_float(header, rec, "SOR", SOR.data(), num_samples);
     bcf_update_format_int32(header, rec, "SB", annos.cnt_type_strand.data(), num_samples * 4);
     bool all_clear = true;
-    
+
     for (auto &&filter : filters) {
         if (!(filter.is_filter(annos))) {
             all_clear = false;
@@ -395,7 +202,7 @@ VcfWriter::write_record(std::string chrom, std::pair<const locus_t, Aggregate> c
     if (all_clear) {
         bcf_add_filter(header, rec, filter_pass_id);
     }
-    
+
     bcf_write(ofile, header, rec);
     bcf_clear(rec);
 }

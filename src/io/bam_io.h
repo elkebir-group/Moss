@@ -61,7 +61,7 @@ namespace moss {
                              bool filter_edit_distance);
 
         // BamStreamer(const BamStreamer &other);
-        
+
         virtual ~BamStreamer();
 
         std::vector<Read> get_column(std::string &ret_contig, int &ret_pos);
