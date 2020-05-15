@@ -8,6 +8,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <string>
 
 // internal bases are stored in 4-bit values.
 
