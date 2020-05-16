@@ -42,6 +42,7 @@ namespace moss {
         bool is_pass;
 
         RecData() : bases(BaseSet(0xff)), is_pass(false) {};
+
         RecData(BaseSet bases, bool is_pass) : bases(bases), is_pass(is_pass) {};
     };
 
@@ -49,6 +50,7 @@ namespace moss {
         int num_pass;
 
         LociRecData() : num_pass(-1) {};
+
         LociRecData(int num_pass) : num_pass(num_pass) {};
     };
 
@@ -116,8 +118,9 @@ namespace moss {
                             search->second.emplace(std::make_pair(rec->pos, RecData{BaseSet{normal_gt}, is_rec_pass}));
                         } else {
                             records.emplace(std::make_pair(contig,
-                                                           std::map<locus_t, RecData>{{rec->pos, RecData{BaseSet{normal_gt},
-                                                                                                         is_rec_pass}}}));
+                                                           std::map<locus_t, RecData>{{rec->pos, RecData{
+                                                               BaseSet{normal_gt},
+                                                               is_rec_pass}}}));
                         }
                     } else {
                         continue;
@@ -169,7 +172,8 @@ namespace moss {
                             search->second.emplace(std::make_pair(rec->pos, LociRecData{*num_pass}));
                         } else {
                             records.emplace(std::make_pair(contig,
-                                                           std::map<locus_t, LociRecData>{{rec->pos, LociRecData{*num_pass}}}));
+                                                           std::map<locus_t, LociRecData>{{rec->pos, LociRecData{
+                                                               *num_pass}}}));
                         }
                         free(num_pass);
                     } else {
@@ -242,12 +246,15 @@ namespace moss {
     }
 
     class FilterHelper;
+
     class VcfWriter;
-    typedef std::function<bool(Annotation&)> FilterFunc;
-    typedef std::function<bool(Annotation&, float)> FilterFuncWithFloat;
+
+    typedef std::function<bool(Annotation &)> FilterFunc;
+    typedef std::function<bool(Annotation &, float)> FilterFuncWithFloat;
 
     class VcfWriter {
         friend class FilterHelper;
+
     private:
         bcf_hdr_t *header;
         bcf1_t *rec;
@@ -257,11 +264,17 @@ namespace moss {
         float qual_thr;
 
         static bool filter_low_qual(Annotation &anno, float thr);
+
         static bool filter_low_normal_depth(Annotation &anno);
+
         static bool filter_low_tumor_support(Annotation &anno);
+
         static bool filter_low_total_depth(Annotation &anno);
+
         static bool filter_low_vaf(Annotation &anno);
+
         static bool filter_empty_strand(Annotation &anno);
+
         static const int LEAST_NORMAL_DEPTH = 6;
         static const int LEAST_TUMOR_SUPPORT = 4;
         static const int LEAST_TOTAL_DEPTH = 150;
@@ -270,25 +283,32 @@ namespace moss {
         bool is_filter_total_dp;
         bool is_filter_vaf;
         // std::vector<std::pair<FilterFunc, int>> filters;
-        struct Filter {FilterFunc is_filter; int filter_id;};
+        struct Filter {
+            FilterFunc is_filter;
+            int filter_id;
+        };
         std::vector<Filter> filters;
 
     public:
         VcfWriter(const std::string &filename, const MapContigLoci &loci, unsigned long num_tumor_samples,
-                  std::string ref_file, const std::vector<std::string> &bam_files, bool filter_total_dp = false, bool filter_vaf = false, float qual_thr = 0);
+                  std::string ref_file, const std::vector<std::string> &bam_files, const std::string &command,
+                  bool filter_total_dp = false,
+                  bool filter_vaf = false, float qual_thr = 0);
 
         ~VcfWriter();
 
-        void write_record(std::string chrom, std::pair<const locus_t, Aggregate> consensus, uint8_t ref, Annotation &annos, int num_samples);
+        void
+        write_record(std::string chrom, std::pair<const locus_t, Aggregate> consensus, uint8_t ref, Annotation &annos,
+                     int num_samples);
 
         FilterHelper addFilters();
     };
 
     class FilterHelper {
     public:
-        FilterHelper(VcfWriter& writer) : writer(writer) {}
+        FilterHelper(VcfWriter &writer) : writer(writer) {}
 
-        FilterHelper& operator()(bool toggle, FilterFunc func, const std::string& line) {
+        FilterHelper &operator()(bool toggle, FilterFunc func, const std::string &line) {
             if (toggle) {
                 bcf_hdr_append(writer.header, line.c_str());
                 auto id_start_pos = line.find("ID") + 3;
@@ -300,7 +320,7 @@ namespace moss {
             return *this;
         }
 
-        FilterHelper& operator()(bool toggle, FilterFuncWithFloat func, float thr, const std::string& line) {
+        FilterHelper &operator()(bool toggle, FilterFuncWithFloat func, float thr, const std::string &line) {
             if (toggle) {
                 bcf_hdr_append(writer.header, line.c_str());
                 auto id_start_pos = line.find("ID") + 3;

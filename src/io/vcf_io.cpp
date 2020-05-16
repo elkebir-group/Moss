@@ -16,24 +16,26 @@
 using namespace moss;
 
 VcfWriter::VcfWriter(const std::string &filename, const MapContigLoci &loci, unsigned long num_tumor_samples,
-                     std::string ref_file, const std::vector<std::string> &bam_files, bool filter_total_dp, bool filter_vaf, float qual_thr)
+                     std::string ref_file, const std::vector<std::string> &bam_files, const std::string &command,
+                     bool filter_total_dp,
+                     bool filter_vaf, float qual_thr)
     : is_filter_total_dp(filter_total_dp), is_filter_vaf(filter_vaf), qual_thr(qual_thr) {
     ofile = bcf_open(filename.c_str(), "w");
     header = bcf_hdr_init("w");
     // FILTER
     addFilters()
-    (true, filter_low_normal_depth,
-        "##FILTER=<ID=LOW_NORMAL_DP,Description=\"The read depth of normal sample is less than 6\">")
-    (true, filter_low_qual, qual_thr,
-        "##FILTER=<ID=LOW_QUAL,Description=\"QUAL is below the threshold\">")
-    (true, filter_low_tumor_support,
-        "##FILTER=<ID=LOW_TUMOR_SUPP,Description=\"Less than 4 reads support in all tumor samples\">")
-    (is_filter_total_dp, filter_low_total_depth,
-        "##FILTER=<ID=LOW_TOTAL_DP,Description=\"Total depth of 23 samples < 150\">")
-    (is_filter_vaf, filter_low_vaf,
-        "##FILTER=<ID=LOW_VAF,Description=\"VAF in any tumor samples < 0.1\">")
-    (true, filter_empty_strand,
-        "##FILTER=<ID=EMPTY_STRAND,Description=\"Total somatic allele count is 0 on one strand\">");
+        (true, filter_low_normal_depth,
+         "##FILTER=<ID=LOW_NORMAL_DP,Description=\"The read depth of normal sample is less than 6\">")
+        (true, filter_low_qual, qual_thr,
+         "##FILTER=<ID=LOW_QUAL,Description=\"QUAL is below the threshold\">")
+        (true, filter_low_tumor_support,
+         "##FILTER=<ID=LOW_TUMOR_SUPP,Description=\"Less than 4 reads support in all tumor samples\">")
+        (is_filter_total_dp, filter_low_total_depth,
+         "##FILTER=<ID=LOW_TOTAL_DP,Description=\"Total depth of 23 samples < 150\">")
+        (is_filter_vaf, filter_low_vaf,
+         "##FILTER=<ID=LOW_VAF,Description=\"VAF in any tumor samples < 0.1\">")
+        (true, filter_empty_strand,
+         "##FILTER=<ID=EMPTY_STRAND,Description=\"Total somatic allele count is 0 on one strand\">");
     // FORMAT
     bcf_hdr_append(header,
                    "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read depth at this position for this sample\">");
@@ -67,7 +69,7 @@ VcfWriter::VcfWriter(const std::string &filename, const MapContigLoci &loci, uns
     std::stringstream ss;
     ss << "##datetime=" << std::put_time(std::localtime(&now), "%FT%T%z");
     bcf_hdr_append(header, ss.str().c_str());
-    bcf_hdr_append(header, "##command=");
+    bcf_hdr_append(header, ("##command=" + command).c_str());
     int i = 0;
     for (const auto &bam_file : bam_files) {
         samFile *fp = sam_open(bam_file.c_str(), "r");
@@ -153,14 +155,15 @@ bool VcfWriter::filter_empty_strand(Annotation &anno) {
     int forward_somatic_cnt = 0;
     int reverse_somatic_cnt = 0;
     for (int i = 1; i < anno.cnt_read.size(); i++) {
-        forward_somatic_cnt += anno.cnt_type_strand[4*i + 2];
-        reverse_somatic_cnt += anno.cnt_type_strand[4*i + 3];
+        forward_somatic_cnt += anno.cnt_type_strand[4 * i + 2];
+        reverse_somatic_cnt += anno.cnt_type_strand[4 * i + 3];
     }
     return (forward_somatic_cnt != 0 && reverse_somatic_cnt != 0);
 }
 
 void
-VcfWriter::write_record(std::string chrom, std::pair<const locus_t, Aggregate> consensus, uint8_t ref, Annotation &annos, int num_samples) {
+VcfWriter::write_record(std::string chrom, std::pair<const locus_t, Aggregate> consensus, uint8_t ref,
+                        Annotation &annos, int num_samples) {
     auto &depth = annos.cnt_read;
     auto &tumor_count = annos.cnt_tumor;
     auto &zq = annos.zq;
@@ -182,12 +185,12 @@ VcfWriter::write_record(std::string chrom, std::pair<const locus_t, Aggregate> c
     bcf_update_info_int32(header, rec, "NUMPASS", &consensus.second.num_pass, 1);
     std::vector<float> SOR(num_samples);
     for (int i = 0; i < num_samples; i++) {
-        float a = annos.cnt_type_strand[4*i] + 1;
-        float b = annos.cnt_type_strand[4*i + 1] + 1;
-        float c = annos.cnt_type_strand[4*i + 2] + 1;
-        float d = annos.cnt_type_strand[4*i + 3] + 1;
+        float a = annos.cnt_type_strand[4 * i] + 1;
+        float b = annos.cnt_type_strand[4 * i + 1] + 1;
+        float c = annos.cnt_type_strand[4 * i + 2] + 1;
+        float d = annos.cnt_type_strand[4 * i + 3] + 1;
         SOR[i] = std::log(((a * d) / (b * c) + (b * c) / (a * d))
-                 * std::min(a, b) * std::max(c, d) / std::min(c, d) / std::max(a, b));
+                          * std::min(a, b) * std::max(c, d) / std::min(c, d) / std::max(a, b));
     }
     bcf_update_format_float(header, rec, "SOR", SOR.data(), num_samples);
     bcf_update_format_int32(header, rec, "SB", annos.cnt_type_strand.data(), num_samples * 4);

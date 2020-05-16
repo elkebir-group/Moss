@@ -298,8 +298,13 @@ int main(int argc, char **argv) {
     std::cout << "## Chrom\tPos \t Prob \t Alt \t Genotype:TumorCount:Coverage" << std::endl;
     moss::Annotation anno(num_samples);
     start = std::chrono::system_clock::now();
-    moss::VcfWriter writer{out_vcf, loci, num_tumor_samples, ref_file, bam_files, static_cast<bool>(flags.filter_total),
-                           static_cast<bool>(flags.filter_vaf), tau};
+    std::string command(argv[0]);
+    for (int i = 1; i < argc; ++i) {
+        command += ' ';
+        command += argv[i];
+    }
+    moss::VcfWriter writer{out_vcf, loci, num_tumor_samples, ref_file, bam_files, command,
+                           static_cast<bool>(flags.filter_total), static_cast<bool>(flags.filter_vaf), tau};
     end = std::chrono::system_clock::now();
     elapsed_seconds = end - start;
     std::cout << "# Writer elapsed time: " << elapsed_seconds.count() << std::endl;
