@@ -325,8 +325,8 @@ int main(int argc, char **argv) {
                     if (flags.pileup == 1) {
                         std::cout << "Columns:" << std::endl;
                         for (const auto &sample : col.get_read_columns()) {
-                            std::cout << "Locus:\t" << chrom.first << '\t' << l.first + 1 << '\t' << col.get_ref() << '\t'
-                                      << sample.size() << std::endl;
+                            std::cout << "Locus:\t" << chrom.first << '\t' << l.first + 1 << '\t' << col.get_ref()
+                                      << '\t' << sample.size() << std::endl;
                             std::ostringstream bases, quals;
                             for (const auto &read : sample) {
                                 bases << seq_nt16_str[read.base] << '\t';

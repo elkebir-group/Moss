@@ -9,7 +9,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
 
-find_package(HTSlib 1.4 REQUIRED)
+find_package(HTSlib 1.7 REQUIRED)
 
 set(OBJ
     src/moss.cpp
