@@ -18,27 +18,21 @@ namespace moss {
 
     using Buffer = std::deque<std::vector<Read>>;
 
-    struct _mplp_conf_t {
-        int min_mq, flag, min_baseQ, capQ_thres, max_depth, max_indel_depth, fmt_flag, all;
-        int rflag_require, rflag_filter;
-        int openQ, extQ, tandemQ, min_support; // for indels
-        double min_frac; // for indels
-        char *reg, *pl_list, *fai_fname, *output_fname;
-        void *bed, *rghash;
-        int argc;
-        char **argv;
-    };
-    using mplp_conf_t = _mplp_conf_t;
-
-    struct _data_t {
+    struct data_t {
         samFile *sam_fp;
         hts_itr_multi_t *iter;
         hts_idx_t *index;
         bam_hdr_t *header;
     };
-    using data_t = _data_t;
+
 
     class BamStreamer {
+    public:
+        virtual std::vector<Read> get_column(std::string &ret_contig, int &ret_pos) = 0;
+        virtual ~BamStreamer() {};
+    };
+
+    class SingleBamStreamer : public BamStreamer {
     private:
         const int min_base_qual;
         const int min_map_qual;
@@ -53,35 +47,41 @@ namespace moss {
         bool is_filter_edit_distance;
         const static uint16_t FAIL_FLAGS = BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP;
     public:
-        explicit BamStreamer(const std::string &ref_file_name,
-                             const std::string &bam_file_name,
-                             const MapContigLoci loci,
-                             int min_baseQ,
-                             int min_mapQ,
-                             bool filter_edit_distance);
+        explicit SingleBamStreamer(const std::string &ref_file_name,
+                                   const std::string &bam_file_name,
+                                   const MapContigLoci loci,
+                                   int min_baseQ,
+                                   int min_mapQ,
+                                   bool filter_edit_distance);
 
-        // BamStreamer(const BamStreamer &other);
+        ~SingleBamStreamer() override;
 
-        virtual ~BamStreamer();
-
-        std::vector<Read> get_column(std::string &ret_contig, int &ret_pos);
+        std::vector<Read> get_column(std::string &ret_contig, int &ret_pos) override;
     };
 
 
-    class PairedBamStreamer {
+    class PairedBamStreamer : public BamStreamer {
     private:
-        BamStreamer original;
-        BamStreamer realigned;
+        SingleBamStreamer original;
+        SingleBamStreamer realigned;
     public:
+        ///
+        /// @param ref_file_name
+        /// @param original_bam_file_name
+        /// @param realigned_bam_file_name
+        /// @param loci
+        /// @param min_baseQ
+        /// @param min_mapQ
+        /// @param filter_edit_distance
         PairedBamStreamer(const std::string &ref_file_name,
                           const std::string &original_bam_file_name,
                           const std::string &realigned_bam_file_name,
-                          const MapContigLoci loci,
+                          MapContigLoci loci,
                           int min_baseQ,
                           int min_mapQ,
                           bool filter_edit_distance);
 
-        std::vector<Read> get_column(std::string &ret_contig, int &ret_pos);
+        std::vector<Read> get_column(std::string &ret_contig, int &ret_pos) override;
     };
 
 
@@ -93,24 +93,22 @@ namespace moss {
         const std::string reference;
         faidx_t *ref_fp;
         const MapContigLoci loci;                           //!< candidate positions
-        std::vector<PairedBamStreamer> streams;                   //!< single bam file
+        std::vector<std::unique_ptr<BamStreamer>> streams;                   //!< single bam file
         const static uint16_t FAIL_FLAGS = BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP;
         bool is_filter_edit_distance;
 
     public:
         explicit MultiBamStreamer(std::string ref_file_name,
-                             const std::vector<std::string> &bam_file_names,
-                             const std::vector<std::string> &realigned_file_names,
-                             const MapContigLoci &loci,
-                             int min_baseQ = 13,
-                             int min_mapQ = 30,
-                             bool filter_edit_distance = false);
+                                  const std::vector<std::string> &bam_file_names,
+                                  const std::vector<std::string> &realigned_file_names,
+                                  const MapContigLoci &loci,
+                                  int min_baseQ = 13,
+                                  int min_mapQ = 30,
+                                  bool filter_edit_distance = false);
 
         virtual ~MultiBamStreamer();
 
         Pileups get_column();
-
-        int print_pileup_seq(const bam_pileup1_t *p, int n);
     };
 }
 

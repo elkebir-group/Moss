@@ -13,14 +13,14 @@ using namespace moss;
 typedef struct {
     int32_t qpos;
     int indel, level;
-    uint32_t is_del:1, is_head:1, is_tail:1, is_refskip:1, aux:28;
+    uint32_t is_del: 1, is_head: 1, is_tail: 1, is_refskip: 1, aux: 28;
     int cigar_ind;
 } PileupMeta;
 
-void resolve_cigar(bam1_t *b, int32_t pos, PileupMeta *p) {
+void resolve_cigar(bam1_t *b, int64_t pos, PileupMeta *p) {
     bam1_core_t *c = &b->core;
     uint32_t *cigar = bam_get_cigar(b);
-    int dist = pos - c->pos;
+    int64_t dist = pos - c->pos;
     int qpos = 0;
     bool is_finish = false;
     for (int k = 0; k < c->n_cigar; k++) {
@@ -30,7 +30,7 @@ void resolve_cigar(bam1_t *b, int32_t pos, PileupMeta *p) {
             case BAM_CMATCH:
             case BAM_CEQUAL:
             case BAM_CDIFF:
-                if (dist <= l-1) {
+                if (dist <= l - 1) {
                     p->qpos = qpos + dist;
                     is_finish = true;
                     break;
@@ -44,7 +44,7 @@ void resolve_cigar(bam1_t *b, int32_t pos, PileupMeta *p) {
                 break;
             case BAM_CDEL:
             case BAM_CREF_SKIP:
-                if (dist <= l-1) {
+                if (dist <= l - 1) {
                     p->is_del = 1;
                     p->is_refskip = (op == BAM_CREF_SKIP);
                     is_finish = true;
@@ -62,13 +62,13 @@ void resolve_cigar(bam1_t *b, int32_t pos, PileupMeta *p) {
     }
 }
 
-BamStreamer::BamStreamer(const std::string &ref_file_name,
-                         const std::string &bam_file_name,
-                         const MapContigLoci loci,
-                         int min_baseQ,
-                         int min_mapQ,
-                         bool filter_edit_distance)
-    : loci(loci),
+SingleBamStreamer::SingleBamStreamer(const std::string &ref_file_name,
+                                     const std::string &bam_file_name,
+                                     MapContigLoci loci,
+                                     int min_baseQ,
+                                     int min_mapQ,
+                                     bool filter_edit_distance)
+    : loci(std::move(loci)),
       min_base_qual(min_baseQ),
       min_map_qual(min_mapQ),
       tid(-1),
@@ -87,8 +87,8 @@ BamStreamer::BamStreamer(const std::string &ref_file_name,
     bam_hdr_t *hdr = sam_hdr_read(fp);
     if (hdr == nullptr) {
         std::cerr << "Error: Failed to fetch header from BAM file " << bam_file_name
-                    << ".fai , the file may be broken."
-                    << std::endl;
+                  << ".fai , the file may be broken."
+                  << std::endl;
         exit(1);
     }
     auto tmp = new data_t *[1];
@@ -137,12 +137,12 @@ BamStreamer::BamStreamer(const std::string &ref_file_name,
         region.emplace_back(list);
     }
     if ((meta[0]->iter = sam_itr_regions(meta[0]->index, meta[0]->header, region.data(),
-                                            region.size())) == nullptr) {
+                                         region.size())) == nullptr) {
         exit(EXIT_FAILURE);
     }
 }
 
-// BamStreamer::BamStreamer(const BamStreamer &other)
+// SingleBamStreamer::SingleBamStreamer(const SingleBamStreamer &other)
 //     : min_base_qual(other.min_base_qual),
 //       min_map_qual(other.min_map_qual),
 //       loci(std::move(loci)),
@@ -155,7 +155,7 @@ BamStreamer::BamStreamer(const std::string &ref_file_name,
 //       buffer(std::move(other.buffer)),
 //       is_filter_edit_distance(other.is_filter_edit_distance) {}
 
-BamStreamer::~BamStreamer() {
+SingleBamStreamer::~SingleBamStreamer() {
     sam_close(meta[0]->sam_fp);
     bam_hdr_destroy(meta[0]->header);
     delete[](meta[0]);
@@ -164,7 +164,7 @@ BamStreamer::~BamStreamer() {
     delete[](region[0].reg);
 }
 
-std::vector<Read> BamStreamer::get_column(std::string &ret_contig, int &ret_pos) {
+std::vector<Read> SingleBamStreamer::get_column(std::string &ret_contig, int &ret_pos) {
     bool not_found = true;
     // begin pileup
     bam1_t *read = bam_init1();
@@ -262,22 +262,21 @@ std::vector<Read> BamStreamer::get_column(std::string &ret_contig, int &ret_pos)
 }
 
 PairedBamStreamer::PairedBamStreamer(const std::string &ref_file_name,
-                          const std::string &original_bam_file_name,
-                          const std::string &realigned_bam_file_name,
-                          const MapContigLoci loci,
-                          int min_baseQ,
-                          int min_mapQ,
-                          bool filter_edit_distance)
+                                     const std::string &original_bam_file_name,
+                                     const std::string &realigned_bam_file_name,
+                                     const MapContigLoci loci,
+                                     int min_baseQ,
+                                     int min_mapQ,
+                                     bool filter_edit_distance)
     : original(ref_file_name, original_bam_file_name, loci, min_baseQ, min_mapQ, filter_edit_distance),
-      realigned(ref_file_name, realigned_bam_file_name, loci, min_baseQ, min_mapQ, filter_edit_distance)
-{}
+      realigned(ref_file_name, realigned_bam_file_name, loci, min_baseQ, min_mapQ, filter_edit_distance) {}
 
 std::vector<Read> PairedBamStreamer::get_column(std::string &ret_contig, int &ret_pos) {
-    std::string contig = "";
+    std::string contig;
     int pos;
     std::vector<Read> orig_col = original.get_column(ret_contig, ret_pos);
     std::vector<Read> realign_col = realigned.get_column(contig, pos);
-    if (realign_col.size() == 0) {
+    if (realign_col.empty()) {
         return orig_col;
     } else {
         for (const auto &realigned_read : realign_col) {
@@ -299,8 +298,8 @@ std::vector<Read> PairedBamStreamer::get_column(std::string &ret_contig, int &re
 }
 
 MultiBamStreamer::MultiBamStreamer(std::string ref_file_name, const std::vector<std::string> &bam_file_names,
-                         const std::vector<std::string> &realigned_file_names,
-                         const MapContigLoci &loci, int min_baseQ, int min_mapQ, bool filter_edit_distance)
+                                   const std::vector<std::string> &realigned_file_names,
+                                   const MapContigLoci &loci, int min_baseQ, int min_mapQ, bool filter_edit_distance)
     : num_samples(bam_file_names.size()),
       min_base_qual(min_baseQ),
       min_map_qual(min_mapQ),
@@ -315,13 +314,24 @@ MultiBamStreamer::MultiBamStreamer(std::string ref_file_name, const std::vector<
     streams.reserve(num_samples);
     assert(bam_file_names.size() == realigned_file_names.size());
     for (int idx = 0; idx < bam_file_names.size(); idx++) {
-        streams.emplace_back(ref_file_name,
-                             bam_file_names[idx],
-                             realigned_file_names[idx],
-                             loci,
-                             min_baseQ,
-                             min_mapQ,
-                             filter_edit_distance);
+        if (realigned_file_names[idx].empty()) {
+            streams.push_back(std::move(std::unique_ptr<SingleBamStreamer>(
+                new SingleBamStreamer(ref_file_name,
+                                      bam_file_names[idx],
+                                      loci,
+                                      min_baseQ,
+                                      min_mapQ,
+                                      filter_edit_distance))));
+        } else {
+            streams.push_back(std::move(std::unique_ptr<PairedBamStreamer>(
+                new PairedBamStreamer(ref_file_name,
+                                      bam_file_names[idx],
+                                      realigned_file_names[idx],
+                                      loci,
+                                      min_baseQ,
+                                      min_mapQ,
+                                      filter_edit_distance))));
+        }
     }
 }
 
@@ -333,14 +343,14 @@ MultiBamStreamer::~MultiBamStreamer() {
 Pileups MultiBamStreamer::get_column() {
     Pileups read_col(num_samples);
     bool not_found = true;
-    std::string contig = "";
+    std::string contig;
     int pos;
     /*!
      * \details For each sample, get reads until the first active locus in the queue is finished,
      * then emplace in the output vector
      */
     for (int j = 0; j < num_samples; ++j) {
-        read_col.emplace_read_column(streams[j].get_column(contig, pos));
+        read_col.emplace_read_column(streams[j]->get_column(contig, pos));
 
         if (not_found && contig.length() > 0) {
             int len_seq;
@@ -349,7 +359,7 @@ Pileups MultiBamStreamer::get_column() {
                 read_col.set_ref(temp[0]);
                 free(temp);
             } else {
-                std::cerr << "Error BamStreamer::get_column: reference error." << std::endl;
+                std::cerr << "Error SingleBamStreamer::get_column: reference error." << std::endl;
                 exit(EXIT_FAILURE);
             }
             not_found = false;
@@ -364,36 +374,4 @@ std::string uint2str(const uint8_t *seq, int len) {
         temp.push_back(seq_nt16_str[bam_seqi(seq, i)]);
     }
     return temp;
-}
-
-int MultiBamStreamer::print_pileup_seq(const bam_pileup1_t *p, int n) {
-    for (int i = 0; i < n; ++i, ++p) {
-        uint8_t *seq = bam_get_seq(p->b);
-//            std::string temp = uint2str(seq, p->b->core.l_qseq);
-        int is_rev = bam_is_rev(p->b);
-        if (p->is_head) {
-            std::cout << '^' << char('!' + std::min(p->b->core.qual, uint8_t(93)));
-        }
-
-        if (p->is_del) {
-            std::cout << (p->is_refskip ? (is_rev ? '<' : '>') : '*');
-        } else {
-            const char c = seq_nt16_str[bam_seqi(seq, p->qpos)];
-            std::cout << char(is_rev ? std::tolower(c) : std::toupper(c));
-        }
-        if (p->indel > 0) {
-            int j;
-            std::cout << std::setiosflags(std::ios_base::showpos) << p->indel << '(';
-            for (j = 1; j <= p->indel; j++)
-                std::cout << seq_nt16_str[bam_seqi(seq, p->qpos + j - p->is_del)];
-            std::cout << ')';
-        }
-        if (p->indel < 0) {
-            std::cout << std::setiosflags(std::ios_base::showpos) << p->indel << "(?)";
-        }
-        if (p->is_tail)
-            std::cout << '$';
-        std::cout << " ";
-    }
-    return 0;
 }

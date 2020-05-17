@@ -116,6 +116,10 @@ int main(int argc, char **argv) {
     if (argc == 1) {
         print_help();
     }
+    enum class BamState {
+        start, original_bam, realigned_bam
+    };
+    BamState state{BamState::start};
     while (true) {
         c = getopt_long(argc, argv, short_opts, long_options, &option_index);
         if (c == -1) {
@@ -133,10 +137,28 @@ int main(int argc, char **argv) {
                 break;
 
             case 'b':
+                switch (state) {
+                    case BamState::original_bam:
+                        realigned_bam_files.emplace_back("");
+                        break;
+                    case BamState::start:
+                    case BamState::realigned_bam:
+                        break;
+                }
+                state = BamState::original_bam;
                 bam_files.emplace_back(std::string(optarg));
                 break;
 
             case 'R':
+                switch (state) {
+                    case BamState::realigned_bam:
+                        realigned_bam_files.emplace_back("");
+                        break;
+                    case BamState::start:
+                    case BamState::original_bam:
+                        break;
+                }
+                state = BamState::realigned_bam;
                 realigned_bam_files.emplace_back(std::string(optarg));
                 break;
 
@@ -191,6 +213,14 @@ int main(int argc, char **argv) {
                 print_help();
         }
     }
+    switch (state) {
+        case BamState::original_bam:
+            realigned_bam_files.emplace_back("");
+            break;
+        case BamState::realigned_bam:
+        case BamState::start:
+            break;
+    }
 
     /* Print any remaining command line arguments (not options). */
     if (optind < argc) {
@@ -212,27 +242,34 @@ int main(int argc, char **argv) {
     }
     std::cout << "# BAM files:\t";
     if (bam_files.size() != realigned_bam_files.size()) {
-        std::cerr << "\nError: Original and realigned BAM files not paired " << std::endl;
+        std::cerr << "\n Error: Original and realigned BAM files not paired " << std::endl;
         return 1;
     }
     for (const std::string &bamFile : bam_files) {
+        if (bamFile.empty()) {
+            continue;
+        }
         std::string indexFile = bamFile + ".bai";
         if (!is_file_exist(bamFile)) {
-            std::cerr << "Error: Failed to open BAM file " << bamFile << std::endl;
+            std::cerr << "\n Error: Failed to open BAM file " << bamFile << std::endl;
             return 1;
         } else if (!is_file_exist(indexFile)) {
-            std::cerr << "Error: Failed to open index file " << indexFile << std::endl;
+            std::cerr << "\n Error: Failed to open index file " << indexFile << std::endl;
             return 1;
         }
         std::cout << bamFile << '\t';
     }
     for (const std::string &bamFile : realigned_bam_files) {
+        // TODO: support *.bai index files without *.bam.bai in front
+        if (bamFile.empty()) {
+            continue;
+        }
         std::string indexFile = bamFile + ".bai";
         if (!is_file_exist(bamFile)) {
-            std::cerr << "Error: Failed to open BAM file " << bamFile << std::endl;
+            std::cerr << "\n Error: Failed to open BAM file " << bamFile << std::endl;
             return 1;
         } else if (!is_file_exist(indexFile)) {
-            std::cerr << "Error: Failed to open index file " << indexFile << std::endl;
+            std::cerr << "\n Error: Failed to open index file " << indexFile << std::endl;
             return 1;
         }
         std::cout << bamFile << '\t';
@@ -240,7 +277,7 @@ int main(int argc, char **argv) {
     std::cout << std::endl << "# Loci file:\t";
     if (!loci_file.empty()) {
         if (!is_file_exist(loci_file)) {
-            std::cerr << "Error: Failed to open loci file " << loci_file << std::endl;
+            std::cerr << "\n Error: Failed to open loci file " << loci_file << std::endl;
             return 1;
         } else {
             std::cout << loci_file << '\t';
@@ -249,7 +286,7 @@ int main(int argc, char **argv) {
     std::cout << std::endl << "# Input VCF files:\t";
     if (!normal_vcf.empty()) {
         if (!is_file_exist(normal_vcf)) {
-            std::cerr << "Error: Failed to open VCF file " << normal_vcf << std::endl;
+            std::cerr << "\n Error: Failed to open VCF file " << normal_vcf << std::endl;
             return 1;
         } else {
             std::cout << normal_vcf << '\t';
@@ -258,7 +295,7 @@ int main(int argc, char **argv) {
     for (const auto &tumor_vcf : tumor_vcfs) {
         if (!tumor_vcf.empty()) {
             if (!is_file_exist(tumor_vcf)) {
-                std::cerr << "Error: Failed to open VCF file " << tumor_vcf << std::endl;
+                std::cerr << "\n Error: Failed to open VCF file " << tumor_vcf << std::endl;
                 return 1;
             } else {
                 std::cout << tumor_vcf << '\t';
