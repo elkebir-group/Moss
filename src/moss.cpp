@@ -84,7 +84,7 @@ void print_help() {
 }
 
 bool is_file_exist(const std::string &name) {
-    struct stat buffer;
+    struct stat buffer{};
     return (stat(name.c_str(), &buffer) == 0);
 }
 
@@ -278,7 +278,7 @@ int main(int argc, char **argv) {
     unsigned long num_tumor_samples = bam_files.size() - 1;
 //    auto loci = moss::merge_loci(loci_files);
     moss::MapContigLoci loci;
-    if (tumor_vcfs.size() > 0) {
+    if (!tumor_vcfs.empty()) {
         loci = moss::merge_vcf(tumor_vcfs);
     } else if (loci_file.length() > 0) {
         loci = moss::import_loci(loci_file);
@@ -303,63 +303,69 @@ int main(int argc, char **argv) {
         command += ' ';
         command += argv[i];
     }
-    moss::VcfWriter writer{out_vcf, loci, num_tumor_samples, ref_file, bam_files, command,
-                           static_cast<bool>(flags.filter_total), static_cast<bool>(flags.filter_vaf), tau};
-    end = std::chrono::system_clock::now();
-    elapsed_seconds = end - start;
-    std::cout << "# Writer elapsed time: " << elapsed_seconds.count() << std::endl;
-    auto now = std::time(nullptr);
-    std::cout << "# Start time: " << std::put_time(std::localtime(&now), "%FT%T%z") << std::endl;
-    for (const auto &chrom : loci) {
-        start = std::chrono::system_clock::now();
-        moss::MultiBamStreamer streamer(ref_file, bam_files, realigned_bam_files,
-                                        moss::MapContigLoci{{chrom.first, chrom.second}}, min_base_qual,
-                                        min_mapping_qual);
+    try {
+        moss::VcfWriter writer{out_vcf, loci, num_tumor_samples, ref_file, bam_files, command,
+                               static_cast<bool>(flags.filter_total), static_cast<bool>(flags.filter_vaf), tau};
         end = std::chrono::system_clock::now();
         elapsed_seconds = end - start;
-        std::cout << "# Streamer elapsed time: " << elapsed_seconds.count() << std::endl;
-        for (const auto &l : chrom.second) {
-            moss::Pileups col = streamer.get_column();
-            if (flags.dry == 1) {
-                if (flags.pileup == 1) {
-                    std::cout << "Columns:" << std::endl;
-                    for (const auto &sample : col.get_read_columns()) {
-                        std::cout << "Locus:\t" << chrom.first << '\t' << l.first + 1 << '\t' << col.get_ref() << '\t'
-                                  << sample.size() << std::endl;
-                        std::ostringstream bases, quals;
-                        for (const auto &read : sample) {
-                            bases << seq_nt16_str[read.base] << '\t';
-                            quals << read.qual << '\t';
+        std::cout << "# Writer elapsed time: " << elapsed_seconds.count() << std::endl;
+        auto now = std::time(nullptr);
+        std::cout << "# Start time: " << std::put_time(std::localtime(&now), "%FT%T%z") << std::endl;
+        for (const auto &chrom : loci) {
+            start = std::chrono::system_clock::now();
+            moss::MultiBamStreamer streamer(ref_file, bam_files, realigned_bam_files,
+                                            moss::MapContigLoci{{chrom.first, chrom.second}}, min_base_qual,
+                                            min_mapping_qual);
+            end = std::chrono::system_clock::now();
+            elapsed_seconds = end - start;
+            std::cout << "# Streamer elapsed time: " << elapsed_seconds.count() << std::endl;
+            for (const auto &l : chrom.second) {
+                moss::Pileups col = streamer.get_column();
+                if (flags.dry == 1) {
+                    if (flags.pileup == 1) {
+                        std::cout << "Columns:" << std::endl;
+                        for (const auto &sample : col.get_read_columns()) {
+                            std::cout << "Locus:\t" << chrom.first << '\t' << l.first + 1 << '\t' << col.get_ref() << '\t'
+                                      << sample.size() << std::endl;
+                            std::ostringstream bases, quals;
+                            for (const auto &read : sample) {
+                                bases << seq_nt16_str[read.base] << '\t';
+                                quals << read.qual << '\t';
+                            }
+                            std::cout << bases.str() << std::endl;
+                            std::cout << quals.str() << std::endl;
                         }
-                        std::cout << bases.str() << std::endl;
-                        std::cout << quals.str() << std::endl;
                     }
-                }
-            } else {
-                // TODO: baseset
-                start = std::chrono::system_clock::now();
-                auto log_proba_non_soma = caller.calling(chrom.first, l.first, col, anno);
-                end = std::chrono::system_clock::now();
-                calling_time += end - start;
+                } else {
+                    // TODO: baseset
+                    start = std::chrono::system_clock::now();
+                    auto log_proba_non_soma = caller.calling(chrom.first, l.first, col, anno);
+                    end = std::chrono::system_clock::now();
+                    calling_time += end - start;
 
-                writer.write_record(chrom.first, l, col.get_ref(), anno, num_samples);
+                    writer.write_record(chrom.first, l, col.get_ref(), anno, num_samples);
 
-                if (log_proba_non_soma < tau) {
-                    std::cout << chrom.first << '\t' << l.first + 1 << '\t' << -10 * log_proba_non_soma << '\t'
-                              << seq_nt16_str[anno.tumor_gt] << '\t';
-                    for (size_t i = 0; i < num_samples; i++) {
-                        std::cout << "0|" << anno.genotype[i] << ':'
-                                  << anno.cnt_tumor[i] << ','
-                                  << anno.cnt_read[i] << '\t';
+                    if (log_proba_non_soma < tau) {
+                        std::cout << chrom.first << '\t' << l.first + 1 << '\t' << -10 * log_proba_non_soma << '\t'
+                                  << seq_nt16_str[anno.tumor_gt] << '\t';
+                        for (size_t i = 0; i < num_samples; i++) {
+                            std::cout << "0|" << anno.genotype[i] << ':'
+                                      << anno.cnt_tumor[i] << ','
+                                      << anno.cnt_read[i] << '\t';
+                        }
+                        std::cout << std::endl;
                     }
-                    std::cout << std::endl;
                 }
             }
         }
+        std::cout << "# Calling elapsed time: " << calling_time.count() << std::endl;
+        now = std::time(nullptr);
+        std::cout << "# End time: " << std::put_time(std::localtime(&now), "%FT%T%z") << std::endl;
     }
-    std::cout << "# Calling elapsed time: " << calling_time.count() << std::endl;
-    now = std::time(nullptr);
-    std::cout << "# End time: " << std::put_time(std::localtime(&now), "%FT%T%z") << std::endl;
+    catch (std::runtime_error &e) {
+        std::cerr << e.what() << std::endl;
+        return -1;
+    }
     return 0;
 }
 

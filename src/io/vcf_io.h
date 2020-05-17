@@ -6,6 +6,7 @@
 #define MOSS_VCF_IO_H
 
 #include <string>
+#include <utility>
 #include <vector>
 #include <map>
 #include <functional>
@@ -51,7 +52,7 @@ namespace moss {
 
         LociRecData() : num_pass(-1) {};
 
-        LociRecData(int num_pass) : num_pass(num_pass) {};
+        explicit LociRecData(int num_pass) : num_pass(num_pass) {};
     };
 
     template<typename T>
@@ -80,9 +81,14 @@ namespace moss {
             hFILE *fp = hopen(filename.c_str(), "r");
             htsFormat format;
             hts_detect_format(fp, &format);
-            hclose(fp);
+            switch (hclose(fp)) {
+                case 0:
+                    break;
+                case EOF:
+                default:
+                    throw std::runtime_error("Failed to close file.");
+            }
             bcf_hdr_t *header;
-            bcf1_t *rec;
             htsFile *ifile;
             ifile = bcf_open(filename.c_str(), get_mode(&format).c_str());
             if (ifile != nullptr) {
@@ -146,9 +152,14 @@ namespace moss {
             hFILE *fp = hopen(filename.c_str(), "r");
             htsFormat format;
             hts_detect_format(fp, &format);
-            hclose(fp);
+            switch (hclose(fp)) {
+                case 0:
+                    break;
+                case EOF:
+                default:
+                    throw std::runtime_error("Failed to close file " + filename);
+            }
             bcf_hdr_t *header;
-            bcf1_t *rec;
             htsFile *ifile;
             ifile = bcf_open(filename.c_str(), get_mode(&format).c_str());
             if (ifile != nullptr) {
@@ -157,7 +168,6 @@ namespace moss {
                 int ngt,
                     *gt = nullptr,
                     ngt_arr = 0;
-                uint8_t normal_gt;
                 while (bcf_read(ifile, header, rec) == 0) {
                     if (bcf_is_snp(rec)) {
                         const char *contig = bcf_hdr_id2name(header, rec->rid);
@@ -217,7 +227,6 @@ namespace moss {
         switch (format->format) {
             case bcf:
                 return "rb";
-                break;
 
             case vcf:
                 if (format->compression == gzip) {
@@ -227,11 +236,9 @@ namespace moss {
                 } else {
                     return "r";
                 }
-                break;
 
             default:
                 return "r";
-                break;
         }
     }
 
@@ -279,7 +286,7 @@ namespace moss {
         static const int LEAST_TUMOR_SUPPORT = 4;
         static const int LEAST_TOTAL_DEPTH = 150;
         static constexpr float LEAST_VAF = 0.1;
-        int filter_pass_id;
+        int filter_pass_id{};
         bool is_filter_total_dp;
         bool is_filter_vaf;
         // std::vector<std::pair<FilterFunc, int>> filters;
@@ -291,7 +298,7 @@ namespace moss {
 
     public:
         VcfWriter(const std::string &filename, const MapContigLoci &loci, unsigned long num_tumor_samples,
-                  std::string ref_file, const std::vector<std::string> &bam_files, const std::string &command,
+                  const std::string& ref_file, const std::vector<std::string> &bam_files, const std::string &command,
                   bool filter_total_dp = false,
                   bool filter_vaf = false, float qual_thr = 0);
 
@@ -315,12 +322,12 @@ namespace moss {
                 auto id_end_pos = line.find_first_of(',', id_start_pos);
                 std::string id = line.substr(id_start_pos, id_end_pos - id_start_pos);
                 int filter_id = bcf_hdr_id2int(writer.header, BCF_DT_ID, id.c_str());
-                writer.filters.push_back({func, filter_id});
+                writer.filters.push_back({std::move(func), filter_id});
             }
             return *this;
         }
 
-        FilterHelper &operator()(bool toggle, FilterFuncWithFloat func, float thr, const std::string &line) {
+        FilterHelper &operator()(bool toggle, const FilterFuncWithFloat& func, float thr, const std::string &line) {
             if (toggle) {
                 bcf_hdr_append(writer.header, line.c_str());
                 auto id_start_pos = line.find("ID") + 3;

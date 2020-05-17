@@ -16,7 +16,7 @@
 using namespace moss;
 
 VcfWriter::VcfWriter(const std::string &filename, const MapContigLoci &loci, unsigned long num_tumor_samples,
-                     std::string ref_file, const std::vector<std::string> &bam_files, const std::string &command,
+                     const std::string& ref_file, const std::vector<std::string> &bam_files, const std::string &command,
                      bool filter_total_dp,
                      bool filter_vaf, float qual_thr)
     : is_filter_total_dp(filter_total_dp), is_filter_vaf(filter_vaf), qual_thr(qual_thr) {
@@ -100,7 +100,13 @@ VcfWriter::VcfWriter(const std::string &filename, const MapContigLoci &loci, uns
 
         ++i;
     }
-    bcf_hdr_write(ofile, header);
+    switch (bcf_hdr_write(ofile, header)) {
+        case 0:
+            break;
+        case -1:
+        default:
+            throw std::runtime_error("Failed to write to file " + filename);
+    }
     rec = bcf_init();
 }
 
@@ -206,7 +212,13 @@ VcfWriter::write_record(std::string chrom, std::pair<const locus_t, Aggregate> c
         bcf_add_filter(header, rec, filter_pass_id);
     }
 
-    bcf_write(ofile, header, rec);
+    switch (bcf_write(ofile, header, rec)) {
+        case 0:
+            break;
+        case -1:
+        default:
+            throw std::runtime_error(std::string("Failed to write record to ") + ofile->fn);
+    }
     bcf_clear(rec);
 }
 
