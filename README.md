@@ -23,7 +23,7 @@ Moss takes as input the BAM files of multiple samples and corresponding VCF outp
 
 Moss is written in C++11 and thus requires a modern C++ compiler (GCC >= 4.8.1, or Clang). In addition, Moss has the following dependencies.
 
-* [HTSlib](https://github.com/samtools/htslib/releases) (>=1.7)
+* [HTSlib](https://github.com/samtools/htslib/releases) (>= 1.7)
 * [CMake](http://www.cmake.org) (>= 3.9)
 * Python (>= 3.6)
 * [Scikit-allel](https://pypi.org/project/scikit-allel/)

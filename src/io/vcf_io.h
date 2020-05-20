@@ -64,14 +64,28 @@ namespace moss {
         static std::string get_mode(htsFormat *format);
 
     public:
+        /**
+         * Read a VCF file and store records.
+         * @param filename is the VCF file to be read.
+         */
         explicit VcfReader(const std::string &filename);
 
         ~VcfReader();
 
+        /**
+         * Find a record.
+         * @param contig is the name of the contig.
+         * @param pos is the position in the contig.
+         * @return The record if found, otherwise returns an empty record.
+         */
         T find(const std::string &contig, locus_t pos);
 
+        /// Get access to the records in VCF.
+        /// @return Const reference to the records.
         const std::map<std::string, std::map<locus_t, T>> &get_records() const;
 
+        /// Whether the VCF file is empty.
+        /// @return Indicator of whether the VCF file is empty.
         bool empty();
     };
 
@@ -289,26 +303,46 @@ namespace moss {
         int filter_pass_id{};
         bool is_filter_total_dp;
         bool is_filter_vaf;
-        // std::vector<std::pair<FilterFunc, int>> filters;
         struct Filter {
             FilterFunc is_filter;
             int filter_id;
         };
         std::vector<Filter> filters;
 
+        FilterHelper addFilters();
+
     public:
+        /**
+         * Construct a writer of VCF file.
+         * @param filename is the name of VCF output.
+         * @param loci contains the contigs.
+         * @param num_tumor_samples is the number of tumor samples.
+         * @param ref_file is the name of the reference FASTA file.
+         * @param bam_files are a vector of BAM files.
+         * @param command is the concatenated command of Moss.
+         * @param filter_total_dp indicates whether filter on total depth.
+         * @param filter_vaf indicates whether filter on minimum VAF.
+         * @param qual_thr is the threshold of quality score, default is 0 (unused);
+         */
         VcfWriter(const std::string &filename, const MapContigLoci &loci, unsigned long num_tumor_samples,
-                  const std::string& ref_file, const std::vector<std::string> &bam_files, const std::string &command,
+                  const std::string &ref_file, const std::vector<std::string> &bam_files, const std::string &command,
                   bool filter_total_dp = false,
                   bool filter_vaf = false, float qual_thr = 0);
 
         ~VcfWriter();
 
+        /**
+         * Write a record to the output VCF file.
+         *
+         * @param chrom is the record's chromosome.
+         * @param consensus is the aggregated information.
+         * @param ref is the reference base.
+         * @param annos is the annotations.
+         * @param num_samples is the total number of samples, including normal.
+         */
         void
         write_record(std::string chrom, std::pair<const locus_t, Aggregate> consensus, uint8_t ref, Annotation &annos,
                      int num_samples);
-
-        FilterHelper addFilters();
     };
 
     class FilterHelper {
@@ -327,7 +361,7 @@ namespace moss {
             return *this;
         }
 
-        FilterHelper &operator()(bool toggle, const FilterFuncWithFloat& func, float thr, const std::string &line) {
+        FilterHelper &operator()(bool toggle, const FilterFuncWithFloat &func, float thr, const std::string &line) {
             if (toggle) {
                 bcf_hdr_append(writer.header, line.c_str());
                 auto id_start_pos = line.find("ID") + 3;

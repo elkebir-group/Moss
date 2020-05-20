@@ -142,19 +142,6 @@ SingleBamStreamer::SingleBamStreamer(const std::string &ref_file_name,
     }
 }
 
-// SingleBamStreamer::SingleBamStreamer(const SingleBamStreamer &other)
-//     : min_base_qual(other.min_base_qual),
-//       min_map_qual(other.min_map_qual),
-//       loci(std::move(loci)),
-//       meta(other.meta),
-//       region(std::move(other.region)),
-//       window(std::move(other.window)),
-//       tid(other.tid),
-//       iter(std::move(other.iter )),
-//       actives(std::move(other.actives)),
-//       buffer(std::move(other.buffer)),
-//       is_filter_edit_distance(other.is_filter_edit_distance) {}
-
 SingleBamStreamer::~SingleBamStreamer() {
     sam_close(meta[0]->sam_fp);
     bam_hdr_destroy(meta[0]->header);
@@ -166,7 +153,7 @@ SingleBamStreamer::~SingleBamStreamer() {
 
 std::vector<Read> SingleBamStreamer::get_column(std::string &ret_contig, int &ret_pos) {
     bool not_found = true;
-    // begin pileup
+    /// begin pileup
     bam1_t *read = bam_init1();
     int ret;
     /*!
@@ -205,13 +192,13 @@ std::vector<Read> SingleBamStreamer::get_column(std::string &ret_contig, int &re
                     }
                 }
             }
-            // update window
+            /// update window
             window.first = begin;
             if (end > window.second) {
                 window.second = end;
             }
 
-            // find new active loci
+            /// find new active loci
             while (iter->first <= window.second) {
                 if (iter !=
                     this->loci.at(std::string(meta[0]->header->target_name[read->core.tid])).cend()) {
@@ -222,7 +209,7 @@ std::vector<Read> SingleBamStreamer::get_column(std::string &ret_contig, int &re
                     break;
                 }
             }
-            // push into queue
+            /// push into queue
             int idx_pos = 0;
             for (const auto &pos : actives) {
                 if (pos >= window.first && pos < end) {

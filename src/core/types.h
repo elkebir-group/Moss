@@ -103,9 +103,9 @@ namespace moss {
 
 
     struct Read{
-        uint8_t base;
-        int qual;
-        bool is_reverse_strand;
+        uint8_t base;               //!< base type
+        int qual;                   //!< base quality of the read
+        bool is_reverse_strand;     //!< is this read on reverse strand
         std::string name;
 
         Read(uint8_t base, int qual, bool is_reverse, std::string name)
@@ -133,15 +133,15 @@ namespace moss {
     };
 
     typedef struct _Annotation {
-        float quality;
-        BaseSet normal_gt;
-        uint8_t tumor_gt;
+        float quality;                      //!< quality score
+        BaseSet normal_gt;                  //!< normal genotype
+        uint8_t tumor_gt;                   //!< tumor genotype
         std::vector<int> genotype;
-        std::vector<int> cnt_read;
-        std::vector<int> cnt_tumor;
-        std::vector<int> cnt_type_strand;
+        std::vector<int> cnt_read;          //!< read counts
+        std::vector<int> cnt_tumor;         //!< tumor read counts
+        std::vector<int> cnt_type_strand;   //!< forward/reverse strand counts for normal and tumor
         std::vector<float> zq;
-        float log_t_in_normal;
+        float log_t_in_normal;              //!< tumor-in-normal score
 
         _Annotation(int num_samples) : genotype(num_samples, 0), cnt_read(num_samples, 0), cnt_tumor(num_samples, 0),
                                        zq(num_samples, 0), cnt_type_strand(num_samples * 4, 0) {}
