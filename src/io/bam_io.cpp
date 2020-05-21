@@ -76,20 +76,16 @@ SingleBamStreamer::SingleBamStreamer(const std::string &ref_file_name,
     htsFormat fmt = {};
     samFile *fp = sam_open_format(bam_file_name.c_str(), "rb", &fmt);
     if (fp == nullptr) {
-        std::cerr << "Error: Failed to open BAM file " << bam_file_name << std::endl;
-        exit(1);
+        throw std::runtime_error("Failed to open BAM file " + bam_file_name);
     }
     hts_idx_t *idx = sam_index_load(fp, bam_file_name.c_str());
     if (idx == nullptr) {
-        std::cerr << "Error: Failed to open BAM index " << bam_file_name << std::endl;
-        exit(1);
+        throw std::runtime_error("Failed to open BAM index of " + bam_file_name);
     }
     bam_hdr_t *hdr = sam_hdr_read(fp);
     if (hdr == nullptr) {
-        std::cerr << "Error: Failed to fetch header from BAM file " << bam_file_name
-                  << ".fai , the file may be broken."
-                  << std::endl;
-        exit(1);
+        throw std::runtime_error(
+            "Failed to fetch header from BAM file " + bam_file_name + ".fai , the file may be broken.");
     }
     auto tmp = new data_t *[1];
     tmp[0] = new data_t[1];
@@ -296,10 +292,12 @@ MultiBamStreamer::MultiBamStreamer(std::string ref_file_name, const std::vector<
     // ref_fp = fai_load(reference.c_str());
     ref_fp = fai_load3(reference.c_str(), (reference + ".fai").c_str(), nullptr, 0x0);
     if (ref_fp == nullptr) {
-        std::cerr << "Error: Failed to open reference file " << reference << std::endl;
+        throw std::runtime_error("Failed to open reference file " + reference);
+    }
+    if (bam_file_names.size() != realigned_file_names.size()) {
+        throw std::runtime_error("Different numbers of original and realigned BAMs in vectors");
     }
     streams.reserve(num_samples);
-    assert(bam_file_names.size() == realigned_file_names.size());
     for (int idx = 0; idx < bam_file_names.size(); idx++) {
         if (realigned_file_names[idx].empty()) {
             streams.push_back(std::move(std::unique_ptr<SingleBamStreamer>(
@@ -346,8 +344,7 @@ Pileups MultiBamStreamer::get_column() {
                 read_col.set_ref(temp[0]);
                 free(temp);
             } else {
-                std::cerr << "Error SingleBamStreamer::get_column: reference error." << std::endl;
-                exit(EXIT_FAILURE);
+                throw std::runtime_error("MultiBamStreamer::get_column: reference error.");
             }
             not_found = false;
         }

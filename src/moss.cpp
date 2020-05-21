@@ -78,7 +78,7 @@ void print_help() {
               "  --dry                  set to dry run\n"
               "  --filter-total          set to filter variants with total tumor depth < 150\n"
               "  --filter-vaf            set to filter variants with VAF in any samples < 0.1\n"
-              "  --ignore0              ignore samples with ref allele in all reads\n"
+              "  --ignore0              ignore samples with all reads same as the normal allele\n"
               "  --pileup               output pileup, only effective in dry-run mode \n";
     exit(1);
 }
@@ -236,14 +236,14 @@ int main(int argc, char **argv) {
 
     if (!is_file_exist(ref_file)) {
         std::cerr << "Error: Failed to open reference file " << ref_file << std::endl;
-        return 1;
+        return -1;
     } else {
         std::cout << "# Reference FASTA file: " << ref_file << std::endl;
     }
     std::cout << "# BAM files:\t";
     if (bam_files.size() != realigned_bam_files.size()) {
         std::cerr << "\n Error: Original and realigned BAM files not paired " << std::endl;
-        return 1;
+        return -1;
     }
     for (const std::string &bamFile : bam_files) {
         if (bamFile.empty()) {
@@ -252,10 +252,10 @@ int main(int argc, char **argv) {
         std::string indexFile = bamFile + ".bai";
         if (!is_file_exist(bamFile)) {
             std::cerr << "\n Error: Failed to open BAM file " << bamFile << std::endl;
-            return 1;
+            return -1;
         } else if (!is_file_exist(indexFile)) {
             std::cerr << "\n Error: Failed to open index file " << indexFile << std::endl;
-            return 1;
+            return -1;
         }
         std::cout << bamFile << '\t';
     }
@@ -267,10 +267,10 @@ int main(int argc, char **argv) {
         std::string indexFile = bamFile + ".bai";
         if (!is_file_exist(bamFile)) {
             std::cerr << "\n Error: Failed to open BAM file " << bamFile << std::endl;
-            return 1;
+            return -1;
         } else if (!is_file_exist(indexFile)) {
             std::cerr << "\n Error: Failed to open index file " << indexFile << std::endl;
-            return 1;
+            return -1;
         }
         std::cout << bamFile << '\t';
     }
@@ -278,7 +278,7 @@ int main(int argc, char **argv) {
     if (!loci_file.empty()) {
         if (!is_file_exist(loci_file)) {
             std::cerr << "\n Error: Failed to open loci file " << loci_file << std::endl;
-            return 1;
+            return -1;
         } else {
             std::cout << loci_file << '\t';
         }
@@ -287,7 +287,7 @@ int main(int argc, char **argv) {
     if (!normal_vcf.empty()) {
         if (!is_file_exist(normal_vcf)) {
             std::cerr << "\n Error: Failed to open VCF file " << normal_vcf << std::endl;
-            return 1;
+            return -1;
         } else {
             std::cout << normal_vcf << '\t';
         }
@@ -296,7 +296,7 @@ int main(int argc, char **argv) {
         if (!tumor_vcf.empty()) {
             if (!is_file_exist(tumor_vcf)) {
                 std::cerr << "\n Error: Failed to open VCF file " << tumor_vcf << std::endl;
-                return 1;
+                return -1;
             } else {
                 std::cout << tumor_vcf << '\t';
             }
@@ -305,7 +305,7 @@ int main(int argc, char **argv) {
     std::cout << std::endl << "# Output VCF file:\t";
     if (out_vcf.empty()) {
         std::cerr << std::endl << "Error: No VCF file specified. Use `-o output.vcf` option to specify." << std::endl;
-        return 1;
+        return -1;
     } else {
         std::cout << out_vcf << std::endl;
     }
@@ -323,7 +323,7 @@ int main(int argc, char **argv) {
         std::cerr << std::endl
                   << "Error: No candidate VCF or loci file specified. Use `-v candidate.vcf` option or `-l candidate.loci` to specify."
                   << std::endl;
-        return 1;
+        return -1;
     }
     std::cout << "# Loci merged" << std::endl;
     auto start = std::chrono::system_clock::now();
@@ -357,6 +357,7 @@ int main(int argc, char **argv) {
             elapsed_seconds = end - start;
             std::cout << "# Streamer elapsed time: " << elapsed_seconds.count() << std::endl;
             for (const auto &l : chrom.second) {
+                // TODO: make get_column iterable, stops when reaches the end
                 moss::Pileups col = streamer.get_column();
                 if (flags.dry == 1) {
                     if (flags.pileup == 1) {
