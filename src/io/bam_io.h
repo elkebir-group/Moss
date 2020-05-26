@@ -8,7 +8,7 @@
 #include <vector>
 #include <string>
 #include <deque>
-#include <iterator>
+#include <memory>
 #include "htslib/sam.h"
 #include "htslib/faidx.h"
 #include "../core/types.h"
