@@ -3,8 +3,6 @@
 //
 
 #include "bam_io.h"
-#include <iostream>
-#include <iomanip>
 #include <cstring>
 #include <cassert>
 
@@ -148,7 +146,6 @@ SingleBamStreamer::~SingleBamStreamer() {
 }
 
 std::vector<Read> SingleBamStreamer::get_column(std::string &ret_contig, int &ret_pos) {
-    bool not_found = true;
     /// begin pileup
     bam1_t *read = bam_init1();
     int ret;
@@ -247,7 +244,7 @@ std::vector<Read> SingleBamStreamer::get_column(std::string &ret_contig, int &re
 PairedBamStreamer::PairedBamStreamer(const std::string &ref_file_name,
                                      const std::string &original_bam_file_name,
                                      const std::string &realigned_bam_file_name,
-                                     const MapContigLoci loci,
+                                     const MapContigLoci& loci,
                                      int min_baseQ,
                                      int min_mapQ,
                                      bool filter_edit_distance)
@@ -289,7 +286,6 @@ MultiBamStreamer::MultiBamStreamer(std::string ref_file_name, const std::vector<
       reference(std::move(ref_file_name)),
       loci(loci),
       is_filter_edit_distance(filter_edit_distance) {
-    // ref_fp = fai_load(reference.c_str());
     ref_fp = fai_load3(reference.c_str(), (reference + ".fai").c_str(), nullptr, 0x0);
     if (ref_fp == nullptr) {
         throw std::runtime_error("Failed to open reference file " + reference);
@@ -350,12 +346,4 @@ Pileups MultiBamStreamer::get_column() {
         }
     }
     return read_col;
-}
-
-std::string uint2str(const uint8_t *seq, int len) {
-    std::string temp;
-    for (int i = 0; i < len; ++i) {
-        temp.push_back(seq_nt16_str[bam_seqi(seq, i)]);
-    }
-    return temp;
 }

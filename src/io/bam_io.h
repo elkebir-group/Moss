@@ -60,7 +60,7 @@ namespace moss {
          */
         explicit SingleBamStreamer(const std::string &ref_file_name,
                                    const std::string &bam_file_name,
-                                   const MapContigLoci loci,
+                                   MapContigLoci loci,
                                    int min_baseQ,
                                    int min_mapQ,
                                    bool filter_edit_distance);
@@ -96,7 +96,7 @@ namespace moss {
         PairedBamStreamer(const std::string &ref_file_name,
                           const std::string &original_bam_file_name,
                           const std::string &realigned_bam_file_name,
-                          MapContigLoci loci,
+                          const MapContigLoci& loci,
                           int min_baseQ,
                           int min_mapQ,
                           bool filter_edit_distance);

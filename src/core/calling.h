@@ -98,7 +98,7 @@ namespace moss {
         std::vector<double> log_TIN;
         std::vector<double> log_beta_pdf;
 
-        BaseSet normal_calling(const std::vector<Read> &column, uint8_t ref);
+        BaseSet normal_calling(const std::vector<Read> &column, uint8_t ref) const;
 
         BaseSet normal_calling(const std::string &contig, locus_t pos, uint8_t ref);
 

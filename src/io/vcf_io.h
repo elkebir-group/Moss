@@ -11,7 +11,7 @@
 #include <map>
 #include <functional>
 #include <htslib/hfile.h>
-#include "htslib/vcf.h"
+#include <htslib/vcf.h>
 #include <htslib/faidx.h>
 #include "../core/types.h"
 
@@ -108,7 +108,7 @@ namespace moss {
             if (ifile != nullptr) {
                 header = bcf_hdr_read(ifile);
                 bcf1_t *rec = bcf_init();
-                int ngt,
+                int ngt{-1},
                     *gt = nullptr,
                     ngt_arr = 0;
                 uint8_t normal_gt;
@@ -179,9 +179,6 @@ namespace moss {
             if (ifile != nullptr) {
                 header = bcf_hdr_read(ifile);
                 bcf1_t *rec = bcf_init();
-                int ngt,
-                    *gt = nullptr,
-                    ngt_arr = 0;
                 while (bcf_read(ifile, header, rec) == 0) {
                     if (bcf_is_snp(rec)) {
                         const char *contig = bcf_hdr_id2name(header, rec->rid);
@@ -206,9 +203,6 @@ namespace moss {
                 }
                 if (rec != nullptr) {
                     bcf_destroy(rec);
-                }
-                if (ngt >= 0) {
-                    free(gt);
                 }
                 bcf_close(ifile);
                 bcf_hdr_destroy(header);
@@ -245,8 +239,6 @@ namespace moss {
             case vcf:
                 if (format->compression == gzip) {
                     return "rz";
-                } else if (format->compression == no_compression) {
-                    return "r";
                 } else {
                     return "r";
                 }

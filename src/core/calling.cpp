@@ -64,7 +64,7 @@ SnvCaller::~SnvCaller() {
     delete[](logAll0);
 }
 
-BaseSet SnvCaller::normal_calling(const std::vector<Read> &column, uint8_t ref) {
+BaseSet SnvCaller::normal_calling(const std::vector<Read> &column, uint8_t ref) const {
     std::map<uint8_t, int> count;
     for (const auto &r : column) {
         count[r.base]++;
