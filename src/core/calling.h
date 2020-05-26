@@ -14,9 +14,13 @@ namespace moss {
 
     double qphred2prob(int qphred);
 
+    /**
+     * Log trinomial coefficient.
+     * @return (s+k+t)! / s! / k! / t!.
+     */
     double log_trinomial(unsigned long s, unsigned long k, unsigned long t);
 
-    /*!
+    /**
      * perform log sum exp trick in one pass
      * @tparam T : numerical that supports add and log
      * @param array : array of log values
@@ -28,32 +32,41 @@ namespace moss {
     template<typename T>
     T log_sum_exp(T a, T b);
 
-    /*!
-     * Initialize max_elem to be -infinity, return accumulate.
-     * @tparam T
-     * @param max_elem
-     * @param accum
-     * @return accumulate
+    template<typename T>
+    T log_sum_exp_array(std::vector<T> array1, std::vector<T> array2);
+
+    /**
+     * Initialize max_elem to be -infinity.
+     * @tparam T is the type of data.
+     * @param max_elem is the maximum element so far.
+     * @param accum is the accumulated log sum.
      */
     template<typename T>
     void log_sum_exp_init(T &max_elem, T &accum);
 
-    /*!
+    /**
      * Single iteration of log sum exp trick.
-     * @tparam T
-     * @param max_elem
-     * @param accum
-     * @param item
+     * @tparam T is the type of data.
+     * @param max_elem is the maximum element so far.
+     * @param accum is the accumulated log sum.
+     * @param item is the new element.
      */
     template<typename T>
     void log_sum_exp_iter(T &max_elem, T &accum, T item);
 
+    /**
+     * Finalize the log sum exp trick.
+     * @tparam T is the type of data.
+     * @param max_elem is the maximum element so far.
+     * @param accum is the accumulated log sum.
+     * @return The total log(sum(exp())).
+     */
     template<typename T>
     T log_sum_exp_final(T &max_elem, T &accum);
 
     class SnvCaller {
     private:
-        VcfReader normal_result;
+        VcfReader<RecData> normal_result;
         int n_tumor_sample,
             gridSize,
             max_depth;
@@ -67,40 +80,66 @@ namespace moss {
             logMu,
             logNoisePriorComplement,
             eps;
+        bool is_ignore0;
 
         std::vector<std::vector<double>> p_err;
         std::vector<std::vector<char>> is_normal;
         std::vector<std::vector<char>> is_tumor;
         std::vector<bool> is_empty;
+        std::vector<bool> is_all_ref;
         std::vector<int> n_tumor;   //* count of tumor allels in samples: n_tumor_sample x n_tumor_bases
         std::vector<int> n_normal;  //* count of normal allels in samples: n_tumor_sample
+        std::vector<double> p_err_normal;
+        std::vector<int> is_normal_normal;
+        std::vector<char> is_tumor_normal;
+        std::vector<int> n_tumor_in_normal;
+        int n_normal_in_normal;
+        std::vector<std::vector<double>> likelihoods_normal;
+        std::vector<double> log_TIN;
+        std::vector<double> log_beta_pdf;
 
-        BaseSet normal_calling(const std::vector<Read> &column, uint8_t ref);
+        BaseSet normal_calling(const std::vector<Read> &column, uint8_t ref) const;
 
         BaseSet normal_calling(const std::string &contig, locus_t pos, uint8_t ref);
 
-        Array3D likelihoods;
+        Array3D likelihoods;        //* n_tumor_sample x n_tumor_base x gridSize
 
-        /*!
+        /**
          * Calculate log likelihood of each samples given tumor base and VAF,
          * P( D_j | f_j, z_j, g_t, g_n).
          * modify member lhood, a 3D vector of size n_tumor_sample x n_tumor_base x gridSize
-         * @param aligned : aligned columns of tumor samples
-         * @param normal_bases : base set of normal given by normal_calling
-         * @param tumor_base : return MLE tumor base
+         * @param aligned are aligned columns of tumor samples.
+         * @param normal_bases is a set of normal bases.
+         * @param tumor_base is the available tumor bases.
          */
         void calc_likelihood(const std::vector<std::vector<Read>> &aligned, BaseSet normal_bases, BaseSet tumor_base);
 
     public:
-
-        SnvCaller(int n_tumor_sample, const std::string& normal, double mu = 1.0 - 5e-6, int max_depth = 500,
-                  int grid_size = 21);
+        /**
+         * Construct a SNV caller
+         *
+         * @param n_tumor_sample is the number of tumor samples.
+         * @param normal is the name of the normal VCF file.
+         * @param is_ignore0 indicates whether ignore samples with all reads same as normal allele.
+         * @param mu is the parameter for mutational rate.
+         * @param max_depth is the advised max-depth in data, will automatically increase when reached.
+         * @param grid_size is the number of grid points approximating the integration.
+         */
+        SnvCaller(int n_tumor_sample, const std::string& normal, bool is_ignore0, double mu = 1.0 - 5e-4,
+                   int max_depth = 500, int grid_size = 21);
 
         ~SnvCaller();
 
+        /**
+         * Calculate the somatic SNV probability and fill the annotations.
+         * @param chrom is the chromosome.
+         * @param pos is the position.
+         * @param pile is the column in pileup.
+         * @param anno is the annotation to be filled.
+         * @return The somatic SNV probability in log space.
+         */
         double
-        calling(const std::string &chrom, locus_t pos, const Pileups &pile, BaseSet &normal_gt, uint8_t &tumor_gt,
-                unsigned long &Z, Annotation &anno);
+        calling(const std::string &chrom, locus_t pos, const Pileups &pile, Annotation &anno);
     };
 }
 

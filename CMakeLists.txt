@@ -7,12 +7,12 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/build/cmake/modules/")
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
 
-find_package(HTSlib 1.4 REQUIRED)
+find_package(HTSlib 1.7 REQUIRED)
 
 set(OBJ
-    src/main.cpp
+    src/moss.cpp
     src/io/bam_io.cpp
     src/io/bam_io.h
     src/io/vcf_io.h

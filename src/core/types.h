@@ -8,14 +8,22 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <string>
 
 // internal bases are stored in 4-bit values.
 
 namespace moss {
     using locus_t = unsigned long;
 
-    // TODO: is std::set really needed here?
-    using MapContigLoci = std::map<std::string, std::set<locus_t>>;
+    struct Aggregate {
+    public:
+        bool is_pass;
+        unsigned num_pass;
+
+        Aggregate(bool is_pass, unsigned num_pass) : is_pass(is_pass), num_pass(num_pass) {}
+    };
+
+    using MapContigLoci = std::map<std::string, std::map<locus_t, Aggregate>>;
 
     enum class IUPAC_nuc : std::uint8_t {
         EQ, A, C, M, G, R, S, V, T, W, Y, H, K, D, B, N
@@ -94,10 +102,19 @@ namespace moss {
     }
 
 
-    typedef struct {
-        uint8_t base;
-        int qual;
-    } Read;
+    struct Read{
+        uint8_t base;               //!< base type
+        int qual;                   //!< base quality of the read
+        bool is_reverse_strand;     //!< is this read on reverse strand
+        std::string name;
+
+        Read(uint8_t base, int qual, bool is_reverse, std::string name)
+            : base(base),
+              qual(qual),
+              is_reverse_strand(is_reverse),
+              name(name)
+        {}
+    };
 
     class Pileups {
     private:
@@ -116,13 +133,29 @@ namespace moss {
     };
 
     typedef struct _Annotation {
+        float quality;                      //!< quality score
+        BaseSet normal_gt;                  //!< normal genotype
+        uint8_t tumor_gt;                   //!< tumor genotype
         std::vector<int> genotype;
-        std::vector<int> cnt_read;
-        std::vector<int> cnt_tumor;
+        std::vector<int> cnt_read;          //!< read counts
+        std::vector<int> cnt_tumor;         //!< tumor read counts
+        std::vector<int> cnt_type_strand;   //!< forward/reverse strand counts for normal and tumor
         std::vector<float> zq;
+        float log_t_in_normal;              //!< tumor-in-normal score
 
         _Annotation(int num_samples) : genotype(num_samples, 0), cnt_read(num_samples, 0), cnt_tumor(num_samples, 0),
-                                       zq(num_samples, 0) {}
+                                       zq(num_samples, 0), cnt_type_strand(num_samples * 4, 0) {}
+
+        _Annotation(int num_samples, BaseSet normal_gt, float quality, uint8_t tumor_gt, float log_t_in_normal)
+            : genotype(num_samples, 0),
+              cnt_read(num_samples, 0),
+              cnt_tumor(num_samples, 0),
+              zq(num_samples, 0),
+              cnt_type_strand(num_samples * 4, 0),
+              quality(quality),
+              normal_gt(normal_gt),
+              tumor_gt(tumor_gt),
+              log_t_in_normal(log_t_in_normal) {}
     } Annotation;
 
 }
