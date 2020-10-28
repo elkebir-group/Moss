@@ -42,10 +42,6 @@ VcfWriter::VcfWriter(const std::string &filename, const MapContigLoci &loci, uns
     bcf_hdr_append(header,
                    "##FORMAT=<ID=TCOUNT,Number=1,Type=Integer,Description=\"Number of reads with alternate allele at this position for this sample\">");
     bcf_hdr_append(header,
-                   "##FORMAT=<ID=Z,Number=1,Type=Integer,Description=\"Boolean indicator of containing somatic SNV in this sample \">");
-    bcf_hdr_append(header,
-                   "##FORMAT=<ID=ZQ,Number=1,Type=Float,Description=\"Sample-specific likelihood of boolean indicator to be true (phred-scaled)\">");
-    bcf_hdr_append(header,
                    "##FORMAT=<ID=SOR,Number=1,Type=Float,Description=\"Symmetric Odds Ratio of 2x2 contingency table to detect strand bias\">");
     bcf_hdr_append(header,
                    "##FORMAT=<ID=SB,Number=4,Type=Integer,Description=\"Per-sample component statistics which comprise"
