@@ -80,7 +80,6 @@ void print_help() {
               "  --filter-vaf            set to filter variants with VAF in any samples < 0.1\n"
               "  --ignore0              ignore samples with all reads same as the normal allele\n"
               "  --pileup               output pileup, only effective in dry-run mode \n";
-    exit(1);
 }
 
 bool is_file_exist(const std::string &name) {
@@ -115,6 +114,7 @@ int main(int argc, char **argv) {
     int option_index = 0;
     if (argc == 1) {
         print_help();
+        exit(1);
     }
     enum class BamState {
         start, original_bam, realigned_bam
@@ -211,6 +211,7 @@ int main(int argc, char **argv) {
             default:
                 /* getopt_long already printed an error message. */
                 print_help();
+                exit(0);
         }
     }
     switch (state) {

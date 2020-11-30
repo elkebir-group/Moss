@@ -3,11 +3,9 @@
 //
 
 #include "calling.h"
-#include <cmath>
 #include <map>
 #include <cassert>
 #include <cstring>
-#include <limits>
 
 using namespace moss;
 
@@ -363,68 +361,4 @@ double moss::qphred2prob(int qphred) {
 double moss::log_trinomial(unsigned long s, unsigned long k, unsigned long t) {
     double log_tri = std::lgamma(s + k + t + 1) - std::lgamma(s + 1) - std::lgamma(k + 1) - std::lgamma(t + 1);
     return log_tri;
-}
-
-template<typename T>
-T moss::log_sum_exp(std::vector<T> array) {
-    T max_elem = -std::numeric_limits<T>::infinity(),
-        accum{};
-    for (const auto &item : array) {
-        if (item >= max_elem) {
-            accum *= exp(max_elem - item);
-            accum += 1.f;
-            max_elem = item;
-        } else {
-            accum += exp(item - max_elem);
-        }
-    }
-    return max_elem + log(accum);
-}
-
-template<typename T>
-T moss::log_sum_exp(T a, T b) {
-    if (a >= b) {
-        return a + log(exp(b - a) + 1.0);
-    } else {
-        return b + log(exp(a - b) + 1.0);
-    }
-}
-
-template<typename T>
-T moss::log_sum_exp_array(std::vector<T> array1, std::vector<T> array2) {
-    T max_elem = -std::numeric_limits<T>::infinity(),
-        accum{};
-    for (int idx = 0; idx < array1.size(); idx++) {
-        T item = array1[idx] + array2[idx];
-        if (item >= max_elem) {
-            accum *= exp(max_elem - item);
-            accum += 1.f;
-            max_elem = item;
-        } else {
-            accum += exp(item - max_elem);
-        }
-    }
-    return max_elem + log(accum);
-}
-
-template<typename T>
-void moss::log_sum_exp_init(T &max_elem, T &accum) {
-    max_elem = -std::numeric_limits<T>::infinity();
-    accum = T{};
-}
-
-template<typename T>
-void moss::log_sum_exp_iter(T &max_elem, T &accum, T item) {
-    if (item >= max_elem) {
-        accum *= exp(max_elem - item);
-        accum += 1.f;
-        max_elem = item;
-    } else {
-        accum += exp(item - max_elem);
-    }
-}
-
-template<typename T>
-T moss::log_sum_exp_final(T &max_elem, T &accum) {
-    return max_elem + log(accum);
 }

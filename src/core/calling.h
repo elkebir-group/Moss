@@ -6,6 +6,8 @@
 #define MOSS_CALLING_H
 
 #include <vector>
+#include <limits>
+#include <cmath>
 #include "types.h"
 #include "../io/vcf_io.h"
 
@@ -27,13 +29,46 @@ namespace moss {
      * @return log summation
      */
     template<typename T>
-    T log_sum_exp(std::vector<T> array);
+    T log_sum_exp(std::vector<T> array) {
+        T max_elem = -std::numeric_limits<T>::infinity(),
+            accum{};
+        for (const auto &item : array) {
+            if (item >= max_elem) {
+                accum *= exp(max_elem - item);
+                accum += 1.f;
+                max_elem = item;
+            } else {
+                accum += exp(item - max_elem);
+            }
+        }
+        return max_elem + log(accum);
+    }
 
     template<typename T>
-    T log_sum_exp(T a, T b);
+    T log_sum_exp(T a, T b) {
+        if (a >= b) {
+            return a + log(exp(b - a) + 1.0);
+        } else {
+            return b + log(exp(a - b) + 1.0);
+        }
+    }
 
     template<typename T>
-    T log_sum_exp_array(std::vector<T> array1, std::vector<T> array2);
+    T log_sum_exp_array(std::vector<T> array1, std::vector<T> array2) {
+        T max_elem = -std::numeric_limits<T>::infinity(),
+            accum{};
+        for (int idx = 0; idx < array1.size(); idx++) {
+            T item = array1[idx] + array2[idx];
+            if (item >= max_elem) {
+                accum *= exp(max_elem - item);
+                accum += 1.f;
+                max_elem = item;
+            } else {
+                accum += exp(item - max_elem);
+            }
+        }
+        return max_elem + log(accum);
+    }
 
     /**
      * Initialize max_elem to be -infinity.
@@ -42,7 +77,10 @@ namespace moss {
      * @param accum is the accumulated log sum.
      */
     template<typename T>
-    void log_sum_exp_init(T &max_elem, T &accum);
+    void log_sum_exp_init(T &max_elem, T &accum) {
+        max_elem = -std::numeric_limits<T>::infinity();
+        accum = T{};
+    }
 
     /**
      * Single iteration of log sum exp trick.
@@ -52,7 +90,15 @@ namespace moss {
      * @param item is the new element.
      */
     template<typename T>
-    void log_sum_exp_iter(T &max_elem, T &accum, T item);
+    void log_sum_exp_iter(T &max_elem, T &accum, T item) {
+        if (item >= max_elem) {
+            accum *= exp(max_elem - item);
+            accum += 1.f;
+            max_elem = item;
+        } else {
+            accum += exp(item - max_elem);
+        }
+    }
 
     /**
      * Finalize the log sum exp trick.
@@ -62,7 +108,9 @@ namespace moss {
      * @return The total log(sum(exp())).
      */
     template<typename T>
-    T log_sum_exp_final(T &max_elem, T &accum);
+    T log_sum_exp_final(T &max_elem, T &accum) {
+        return max_elem + log(accum);
+    }
 
     class SnvCaller {
     private:

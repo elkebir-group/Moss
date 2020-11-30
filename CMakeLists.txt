@@ -41,3 +41,10 @@ set(TEST_FILES
 add_executable(test ${TEST_FILES})
 target_include_directories(test PUBLIC ${HTSlib_INCLUDE_DIRS})
 target_link_libraries(test ${HTSlib_LIBRARIES})
+
+install(TARGETS moss
+    DESTINATION ${CMAKE_INSTALL_PREFIX}
+    )
+# install(TARGETS test
+#     DESTINATION ${CMAKE_INSTALL_PREFIX}
+#     )
