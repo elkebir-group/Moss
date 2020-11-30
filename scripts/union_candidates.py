@@ -65,8 +65,11 @@ def mutect2(inputs, normal_name) -> dict:
             in_vcf["variants/REF"][in_vcf["variants/is_snp"]],
             in_vcf["variants/ALT"][in_vcf["variants/is_snp"]],
             in_vcf["calldata/GT"][in_vcf["variants/is_snp"]],
-            in_vcf["variants/FILTER_PASS"][in_vcf["variants/is_snp"]])
-        for chrom, pos, ref, alt, gt, is_pass in zipped:
+            in_vcf["variants/FILTER_PASS"][in_vcf["variants/is_snp"]],
+            in_vcf["variants/FILTER_artifact_in_normal"][in_vcf["variants/is_snp"]])
+        for chrom, pos, ref, alt, gt, is_pass, is_artifact in zipped:
+            if is_artifact:
+                continue
             chrom = str(chrom)
             pos = int(pos)
             num_pass = int(is_pass)
