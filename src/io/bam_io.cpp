@@ -76,7 +76,7 @@ SingleBamStreamer::SingleBamStreamer(const std::string &ref_file_name,
     if (fp == nullptr) {
         throw std::runtime_error("Failed to open BAM file " + bam_file_name);
     }
-    hts_idx_t *idx = sam_index_load(fp, bam_file_name.c_str());
+    hts_idx_t *idx = sam_index_load2(fp, bam_file_name.c_str(), nullptr);
     if (idx == nullptr) {
         throw std::runtime_error("Failed to open BAM index of " + bam_file_name);
     }

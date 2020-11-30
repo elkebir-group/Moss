@@ -250,11 +250,13 @@ int main(int argc, char **argv) {
             continue;
         }
         std::string indexFile = bamFile + ".bai";
+        std::string indexFile2 = bamFile;
+        indexFile2.replace(indexFile2.end()-3, indexFile2.end(), "bai");
         if (!is_file_exist(bamFile)) {
             std::cerr << "\n Error: Failed to open BAM file " << bamFile << std::endl;
             return -1;
-        } else if (!is_file_exist(indexFile)) {
-            std::cerr << "\n Error: Failed to open index file " << indexFile << std::endl;
+        } else if (!is_file_exist(indexFile) && !is_file_exist(indexFile2)) {
+            std::cerr << "\n Error: Failed to open index file of " << bamFile << std::endl;
             return -1;
         }
         std::cout << bamFile << '\t';
@@ -265,11 +267,13 @@ int main(int argc, char **argv) {
             continue;
         }
         std::string indexFile = bamFile + ".bai";
+        std::string indexFile2 = bamFile;
+        indexFile2.replace(indexFile2.end()-3, indexFile2.end(), "bai");
         if (!is_file_exist(bamFile)) {
             std::cerr << "\n Error: Failed to open BAM file " << bamFile << std::endl;
             return -1;
-        } else if (!is_file_exist(indexFile)) {
-            std::cerr << "\n Error: Failed to open index file " << indexFile << std::endl;
+        } else if (!is_file_exist(indexFile) && !is_file_exist(indexFile2)) {
+            std::cerr << "\n Error: Failed to open index file of " << bamFile << std::endl;
             return -1;
         }
         std::cout << bamFile << '\t';

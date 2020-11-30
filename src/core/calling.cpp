@@ -149,7 +149,7 @@ SnvCaller::calc_likelihood(const std::vector<std::vector<Read>> &aligned, BaseSe
                 double lhood = 0;
                 double f = idx_step * stepSize;
                 unsigned long sample_size = sample.size();
-                assert(sample_size < max_depth);
+                assert(sample_size <= max_depth);
                 if (idx_sample == -1) {
                     for (int j = 0; j < sample_size; ++j) {
                         if (is_normal_normal[j]) {
