@@ -70,3 +70,11 @@ For example, after you've built `moss` in the `build/` directory, you can run th
 ``` bash
 ./moss -r ../data/demo20.fa -b ../data/normal.sort.bam -R ../data/empty.bam -b ../data/clone0.spike.sort.bam -R ../data/empty.bam -b ../data/clone1.spike.sort.bam -R ../data/empty.bam -b ../data/clone2.spike.sort.bam -R ../data/empty.bam -b ../data/clone3.spike.sort.bam -R ../data/empty.bam -l ../data/candidates.chrdemo20.vcf -m 4 -t -0.693 --ignore0 --grid-size 200 -o example.vcf
 ```
+
+Finally, we filter the result VCF file:
+
+``` bash
+bgzip example.vcf
+tabix example.vcf.gz
+python ../scripts/post_filter.py --normal-name sample0 -i example.vcf.gz -o example.post_filter.vcf
+```

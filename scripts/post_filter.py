@@ -37,7 +37,7 @@ def apply_filters(ifile: str, ofile: str, threshold=100, normal_name="normal", j
             '##FILTER=<ID=CLUSTER,Description="The site is clutered with at least 2 neighbors within 100bp">')
         header.add_line(
             '##FILTER=<ID=LOW_TIN,Description="TIN score is lower than 20">')
-        header.add_line('##FILTER=<ID=FALLBACK,Description="FALLBACK">')
+        header.add_line('##FILTER=<ID=FALLBACK,Description="Fallback to single-sample caller and NUMPASS=0">')
         with VariantFile(ofile, 'w', header=header) as vcf_out:
             for contig in vcf_in.header.contigs:
                 buffer = []
