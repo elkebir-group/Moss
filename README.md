@@ -8,18 +8,48 @@ Moss takes as input the BAM files of multiple samples and corresponding VCF outp
 
 ## Contents
 
-  1. [Compilation instructions](#compilation)
-     * [Dependencies](#dep)
-     * [Compilation](#comp)
+  1. [Installation](#install)
+      * [Using conda](#conda) (recommended)
+      * [Build from source](#compilation) (alternative)
+          * [Dependencies](#dep)
+          * [Compilation](#comp)
   2. [Usage instructions](#usage)
+
+<a name="install"></a>
+
+## Installation
+
+<a name="conda"></a>
+
+### Using conda (recommended)
+
+1. Download the [released package](https://github.com/elkebir-group/Moss/releases/) of the latest version: `moss-0.1.0-linux-x86_64.tar.bz2` or `moss-0.1.0-MacOSX-x86_64.tar.bz2` based on your system.
+2. Create a new conda environment named "moss" and install dependencies:
+
+   ```bash
+   conda create -n moss -c conda-forge -c bioconda htslib pandas pysam scikit-allel
+   ```
+
+3. Then activate the created environment: `conda activate moss`.
+4. Install the package into current environment "moss":
+
+    ```bash
+    conda install moss-0.1.0-linux-x86_64.tar.bz2
+    ```
+
+    or
+
+    ```bash
+    conda install moss-0.1.0-MacOSX-x86_64.tar.bz2
+    ```
 
 <a name="compilation"></a>
 
-## Compilation instructions
+### Build from source (alternative)
 
 <a name="dep"></a>
 
-### Dependencies
+#### Dependencies
 
 Moss is written in C++11 and thus requires a modern C++ compiler (GCC >= 4.8.1, or Clang). In addition, Moss has the following dependencies.
 
@@ -29,8 +59,7 @@ Moss is written in C++11 and thus requires a modern C++ compiler (GCC >= 4.8.1, 
 * [Scikit-allel](https://pypi.org/project/scikit-allel/)
 
 <a name="comp"></a>
-
-### Compilation
+#### Compilation
 
 ```bash
 mkdir build
@@ -53,7 +82,6 @@ make
 The compilation results in the executable `moss`.
 
 <a name="usage"></a>
-
 ## Usage instructions
 
 Moss works on top of other somatic variant calling methods, such as Strelka2 and Mutect2.
