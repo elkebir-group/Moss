@@ -1,5 +1,8 @@
 # Moss
 
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/moss/badges/version.svg)](https://anaconda.org/bioconda/moss)
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/moss/README.html)
+
 Moss is a multi-sample somatic single nucleotide variant (SNV) calling tool aiming for discovering variants with a low variant allele frequency that repeatedly appears in several samples.
 Moss works as an extension to existing single-sample somatic variant callers and improves the recall meanwhile maintains high precision.
 Moss takes as input the BAM files of multiple samples and corresponding VCF output of the single-sample caller.
@@ -23,24 +26,17 @@ Moss takes as input the BAM files of multiple samples and corresponding VCF outp
 
 ### Using conda (recommended)
 
-1. Download the [released package](https://github.com/elkebir-group/Moss/releases/) of the latest version: `moss-0.1.0-linux-x86_64.tar.bz2` or `moss-0.1.0-MacOSX-x86_64.tar.bz2` based on your system.
-2. Create a new conda environment named "moss" and install dependencies:
+1. Create a new conda environment named "moss" and install dependencies:
 
    ```bash
-   conda create -n moss -c conda-forge -c bioconda htslib pandas pysam scikit-allel
+   conda create -n moss
    ```
 
-3. Then activate the created environment: `conda activate moss`.
-4. Install the package into current environment "moss":
+2. Then activate the created environment: `conda activate moss`.
+3. Install the package into current environment "moss":
 
     ```bash
-    conda install moss-0.1.0-linux-x86_64.tar.bz2
-    ```
-
-    or
-
-    ```bash
-    conda install moss-0.1.0-MacOSX-x86_64.tar.bz2
+    conda install -c bioconda moss
     ```
 
 <a name="compilation"></a>
