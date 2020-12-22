@@ -94,33 +94,52 @@ def mutect2(inputs, normal_name) -> dict:
     return chrom_pos_gt
 
 
-def write_vcf(dict_chrom_pos_gt: dict, output, input_files):
+def write_vcf(dict_chrom_pos_gt: dict, output, input_files, is_split: bool):
     header = """##fileformat=VCFv4.1
 ##FILTER=<ID=PASS,Description="All filters passed">
 ##INFO=<ID=NUMPASS,Number=1,Type=Integer,Description=\"Number of samples that pass the base caller\">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 #CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNORMAL\n"""
-    for chrom, pos_info in dict_chrom_pos_gt.items():
-        prefix = 'chr' if not chrom.startswith("chr") else ''
-        out_filename = output[:output.rfind('.')] + f".{prefix}{chrom}.vcf"
-        with open(out_filename, "w") as ofile:
+    if is_split:
+        for chrom, pos_info in dict_chrom_pos_gt.items():
+            prefix = 'chr' if not chrom.startswith("chr") else ''
+            out_filename = output[:output.rfind('.')] + f".{prefix}{chrom}.vcf"
+            with open(out_filename, "w") as ofile:
+                ofile.write(header)
+                chunk = []
+                cnt = 0
+                for pos, info in pos_info.items():
+                    gt = info["gt"]
+                    num_pass = info["num_pass"]
+                    info = f"NUMPASS={num_pass}"
+                    if gt[0] == gt[1]:
+                        chunk.append(
+                            f"{chrom}\t{pos}\t.\t{gt[0]}\t.\t.\t.\t{info}\tGT\t0|0\n")
+                    cnt += 1
+                    if cnt % 1000 == 0:
+                        ofile.writelines(chunk)
+                        chunk = []
+                        cnt = 0
+                ofile.writelines(chunk)
+    else:
+        with open(output, "w") as ofile:
             ofile.write(header)
-            chunk = []
-            cnt = 0
-            for pos, info in pos_info.items():
-                gt = info["gt"]
-                num_pass = info["num_pass"]
-                info = f"NUMPASS={num_pass}"
-                if gt[0] == gt[1]:
-                    chunk.append(
-                        f"{chrom}\t{pos}\t.\t{gt[0]}\t.\t.\t.\t{info}\tGT\t0|0\n")
-                cnt += 1
-                if cnt % 1000 == 0:
-                    ofile.writelines(chunk)
-                    chunk = []
-                    cnt = 0
-            ofile.writelines(chunk)
-
+            for chrom, pos_info in dict_chrom_pos_gt.items():
+                chunk = []
+                cnt = 0
+                for pos, info in pos_info.items():
+                    gt = info["gt"]
+                    num_pass = info["num_pass"]
+                    info = f"NUMPASS={num_pass}"
+                    if gt[0] == gt[1]:
+                        chunk.append(
+                            f"{chrom}\t{pos}\t.\t{gt[0]}\t.\t.\t.\t{info}\tGT\t0|0\n")
+                    cnt += 1
+                    if cnt % 1000 == 0:
+                        ofile.writelines(chunk)
+                        chunk = []
+                        cnt = 0
+                ofile.writelines(chunk)
 
 def main(args):
     if args.input_files is not None:
@@ -137,7 +156,7 @@ def main(args):
         chrom_pos_gt = mutect2(args.input, args.normal_name)
     elif args.tool[0].lower() == 's':
         chrom_pos_gt = strelka2(args.input)
-    write_vcf(chrom_pos_gt, args.output, args.input_files)
+    write_vcf(chrom_pos_gt, args.output, args.input_files, args.split)
 
 
 if __name__ == "__main__":
@@ -147,6 +166,7 @@ if __name__ == "__main__":
     parser.add_argument("-f", "--input-files", help="input tumor result VCF file list")
     parser.add_argument("-t", "--tool", help="[M|m|Mutect] or [S|s|Strelka]", required=True)
     parser.add_argument("-o", "--output", help="output candidates VCF file")
+    parser.add_argument("--split", help="split output VCF by chromosomes", action="store_true")
     args = parser.parse_args(None if sys.argv[1:] else ['-h'])
 
     main(args)

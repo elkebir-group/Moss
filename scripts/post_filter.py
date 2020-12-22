@@ -38,6 +38,10 @@ def apply_filters(ifile: str, ofile: str, threshold=100, normal_name="normal", j
         header.add_line(
             '##FILTER=<ID=LOW_TIN,Description="TIN score is lower than 20">')
         header.add_line('##FILTER=<ID=FALLBACK,Description="Fallback to single-sample caller and NUMPASS=0">')
+        header.add_line(f"##normal_sample={normal_name}")
+        for sample in header.samples:
+            if sample != normal_name:
+                header.add_line(f"##tumor_sample={sample}")
         with VariantFile(ofile, 'w', header=header) as vcf_out:
             for contig in vcf_in.header.contigs:
                 buffer = []
