@@ -2,7 +2,6 @@
 ##FILTER=<ID=PASS,Description="All filters passed">
 ##INFO=<ID=NUMPASS,Number=1,Type=Integer,Description="Number of samples that pass the base caller">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
-##contig=<ID=demo20,length=5000>
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	NORMAL
 demo20	584	.	C	.	.	.	NUMPASS=0	GT	0|0
 demo20	632	.	G	.	.	.	NUMPASS=4	GT	0|0

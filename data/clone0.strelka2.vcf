@@ -1,0 +1,62 @@
+##fileformat=VCFv4.1
+##fileDate=20190428
+##source=strelka
+##source_version=UNKNOWN
+##startTime=Sun Apr 28 18:29:14 2019
+##reference=demo20.fa
+##contig=<ID=demo20,length=5000>
+##content=strelka somatic snv calls
+##priorSomaticSnvRate=0.0001
+##INFO=<ID=QSS,Number=1,Type=Integer,Description="Quality score for any somatic snv, ie. for the ALT allele to be present at a significantly different frequency in the tumor and normal">
+##INFO=<ID=TQSS,Number=1,Type=Integer,Description="Data tier used to compute QSS">
+##INFO=<ID=NT,Number=1,Type=String,Description="Genotype of the normal in all data tiers, as used to classify somatic variants. One of {ref,het,hom,conflict}.">
+##INFO=<ID=QSS_NT,Number=1,Type=Integer,Description="Quality score reflecting the joint probability of a somatic variant and NT">
+##INFO=<ID=TQSS_NT,Number=1,Type=Integer,Description="Data tier used to compute QSS_NT">
+##INFO=<ID=SGT,Number=1,Type=String,Description="Most likely somatic genotype excluding normal noise states">
+##INFO=<ID=SOMATIC,Number=0,Type=Flag,Description="Somatic mutation">
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Combined depth across samples">
+##INFO=<ID=MQ,Number=1,Type=Float,Description="RMS Mapping Quality">
+##INFO=<ID=MQ0,Number=1,Type=Integer,Description="Total Mapping Quality Zero Reads">
+##INFO=<ID=ReadPosRankSum,Number=1,Type=Float,Description="Z-score from Wilcoxon rank sum test of Alt Vs. Ref read-position in the tumor">
+##INFO=<ID=SNVSB,Number=1,Type=Float,Description="Somatic SNV site strand bias">
+##INFO=<ID=PNOISE,Number=1,Type=Float,Description="Fraction of panel containing non-reference noise at this site">
+##INFO=<ID=PNOISE2,Number=1,Type=Float,Description="Fraction of panel containing more than one non-reference noise obs at this site">
+##INFO=<ID=SomaticEVS,Number=1,Type=Float,Description="Somatic Empirical Variant Score (EVS) expressing the phred-scaled probability of the call being a false positive observation.">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read depth for tier1 (used+filtered)">
+##FORMAT=<ID=FDP,Number=1,Type=Integer,Description="Number of basecalls filtered from original read depth for tier1">
+##FORMAT=<ID=SDP,Number=1,Type=Integer,Description="Number of reads with deletions spanning this site at tier1">
+##FORMAT=<ID=SUBDP,Number=1,Type=Integer,Description="Number of reads below tier1 mapping quality threshold aligned across this site">
+##FORMAT=<ID=AU,Number=2,Type=Integer,Description="Number of 'A' alleles used in tiers 1,2">
+##FORMAT=<ID=CU,Number=2,Type=Integer,Description="Number of 'C' alleles used in tiers 1,2">
+##FORMAT=<ID=GU,Number=2,Type=Integer,Description="Number of 'G' alleles used in tiers 1,2">
+##FORMAT=<ID=TU,Number=2,Type=Integer,Description="Number of 'T' alleles used in tiers 1,2">
+##FILTER=<ID=LowEVS,Description="Somatic Empirical Variant Score (SomaticEVS) is below threshold">
+##FILTER=<ID=LowDepth,Description="Tumor or normal sample read depth at this locus is below 2">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	NORMAL	TUMOR
+demo20	584	.	C	G	.	LowEVS	SOMATIC;QSS=8;TQSS=1;NT=ref;QSS_NT=8;TQSS_NT=1;SGT=CC->CG;DP=61;MQ=60.00;MQ0=0;ReadPosRankSum=1.58;SNVSB=0.70;SomaticEVS=1.24	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	24:0:0:0:0,0:24,24:0,0:0,0	37:0:0:0:0,0:35,35:2,2:0,0
+demo20	632	.	G	A	.	PASS	SOMATIC;QSS=70;TQSS=1;NT=ref;QSS_NT=70;TQSS_NT=1;SGT=GG->AG;DP=56;MQ=60.00;MQ0=0;ReadPosRankSum=2.66;SNVSB=0.00;SomaticEVS=19.98	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	22:0:0:0:0,0:0,0:22,22:0,0	34:0:0:0:7,7:0,0:27,27:0,0
+demo20	727	.	C	T	.	LowEVS	SOMATIC;QSS=3;TQSS=1;NT=ref;QSS_NT=3;TQSS_NT=1;SGT=CC->CC;DP=57;MQ=60.00;MQ0=0;ReadPosRankSum=2.34;SNVSB=0.65;SomaticEVS=0.99	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	25:0:0:0:0,0:25,25:0,0:0,0	32:0:0:0:0,0:30,30:0,0:2,2
+demo20	761	.	C	A	.	PASS	SOMATIC;QSS=83;TQSS=1;NT=ref;QSS_NT=83;TQSS_NT=1;SGT=CC->AC;DP=61;MQ=60.00;MQ0=0;ReadPosRankSum=2.19;SNVSB=0.00;SomaticEVS=19.98	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	31:0:0:0:0,0:31,31:0,0:0,0	30:0:0:0:9,9:21,21:0,0:0,0
+demo20	991	.	C	G	.	PASS	SOMATIC;QSS=89;TQSS=1;NT=ref;QSS_NT=89;TQSS_NT=1;SGT=CC->CG;DP=58;MQ=60.00;MQ0=0;ReadPosRankSum=0.32;SNVSB=0.00;SomaticEVS=19.98	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	35:0:0:0:0,0:35,35:0,0:0,0	23:0:0:0:0,0:15,15:8,8:0,0
+demo20	1271	.	A	G	.	PASS	SOMATIC;QSS=88;TQSS=1;NT=ref;QSS_NT=88;TQSS_NT=1;SGT=AA->AG;DP=68;MQ=60.00;MQ0=0;ReadPosRankSum=0.89;SNVSB=0.00;SomaticEVS=19.98	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	34:0:0:0:34,34:0,0:0,0:0,0	34:0:0:0:24,24:0,0:10,10:0,0
+demo20	1508	.	A	G	.	PASS	SOMATIC;QSS=70;TQSS=1;NT=ref;QSS_NT=70;TQSS_NT=1;SGT=AA->AG;DP=46;MQ=60.00;MQ0=0;ReadPosRankSum=1.49;SNVSB=0.00;SomaticEVS=19.98	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	27:0:0:0:27,27:0,0:0,0:0,0	19:0:0:0:13,13:0,0:6,6:0,0
+demo20	1706	.	C	T	.	LowEVS	SOMATIC;QSS=39;TQSS=1;NT=ref;QSS_NT=39;TQSS_NT=1;SGT=CC->CT;DP=67;MQ=60.00;MQ0=0;ReadPosRankSum=2.62;SNVSB=1.76;SomaticEVS=4.23	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	35:0:0:0:0,0:35,35:0,0:0,0	32:0:0:0:0,0:29,29:0,0:3,3
+demo20	1744	.	C	T	.	PASS	SOMATIC;QSS=78;TQSS=1;NT=ref;QSS_NT=78;TQSS_NT=1;SGT=CC->CT;DP=69;MQ=60.00;MQ0=0;ReadPosRankSum=2.38;SNVSB=0.00;SomaticEVS=19.87	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	38:0:0:0:0,0:38,38:0,0:0,0	31:0:0:0:0,0:25,25:0,0:6,6
+demo20	1873	.	C	T	.	PASS	SOMATIC;QSS=81;TQSS=1;NT=ref;QSS_NT=81;TQSS_NT=1;SGT=CC->CT;DP=56;MQ=60.00;MQ0=0;ReadPosRankSum=-0.85;SNVSB=0.00;SomaticEVS=19.98	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	36:0:0:0:1,1:35,35:0,0:0,0	20:0:0:0:0,0:12,12:0,0:8,8
+demo20	2074	.	T	C	.	PASS	SOMATIC;QSS=82;TQSS=1;NT=ref;QSS_NT=82;TQSS_NT=1;SGT=TT->CT;DP=76;MQ=60.00;MQ0=0;ReadPosRankSum=3.37;SNVSB=0.00;SomaticEVS=14.67	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	38:0:0:0:0,0:0,0:0,0:38,38	38:0:0:0:0,0:8,8:0,0:30,30
+demo20	2199	.	G	A	.	PASS	SOMATIC;QSS=85;TQSS=1;NT=ref;QSS_NT=85;TQSS_NT=1;SGT=GG->AG;DP=69;MQ=60.00;MQ0=0;ReadPosRankSum=2.10;SNVSB=0.00;SomaticEVS=19.98	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	44:0:0:0:0,0:0,0:44,44:0,0	25:0:0:0:6,6:0,0:19,19:0,0
+demo20	2301	.	G	T	.	PASS	SOMATIC;QSS=75;TQSS=1;NT=ref;QSS_NT=75;TQSS_NT=1;SGT=GG->GT;DP=64;MQ=60.00;MQ0=0;ReadPosRankSum=1.92;SNVSB=2.95;SomaticEVS=7.02	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	36:0:0:0:0,0:0,0:36,36:0,0	28:0:0:0:0,0:0,0:23,23:5,5
+demo20	2455	.	T	C	.	PASS	SOMATIC;QSS=64;TQSS=1;NT=ref;QSS_NT=64;TQSS_NT=1;SGT=TT->CT;DP=72;MQ=60.00;MQ0=0;ReadPosRankSum=2.91;SNVSB=0.00;SomaticEVS=15.33	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	32:0:0:0:0,0:0,0:0,0:32,32	40:0:0:0:0,0:4,4:0,0:36,36
+demo20	2512	.	A	G	.	PASS	SOMATIC;QSS=80;TQSS=1;NT=ref;QSS_NT=80;TQSS_NT=1;SGT=AA->AG;DP=67;MQ=60.00;MQ0=0;ReadPosRankSum=3.10;SNVSB=0.00;SomaticEVS=16.50	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	32:0:0:0:32,32:0,0:0,0:0,0	35:0:0:0:27,27:0,0:8,8:0,0
+demo20	2660	.	G	T	.	LowEVS	SOMATIC;QSS=69;TQSS=1;NT=ref;QSS_NT=69;TQSS_NT=1;SGT=GG->GT;DP=54;MQ=60.00;MQ0=0;ReadPosRankSum=1.85;SNVSB=6.14;SomaticEVS=5.12	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	24:0:0:0:0,0:0,0:24,24:0,0	30:0:0:0:0,0:0,0:22,22:8,8
+demo20	3054	.	G	C	.	PASS	SOMATIC;QSS=81;TQSS=1;NT=ref;QSS_NT=81;TQSS_NT=1;SGT=GG->CG;DP=56;MQ=60.00;MQ0=0;ReadPosRankSum=1.22;SNVSB=0.00;SomaticEVS=19.98	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	31:0:0:0:0,0:0,0:31,31:0,0	25:0:0:0:0,0:8,8:17,17:0,0
+demo20	3366	.	G	T	.	PASS	SOMATIC;QSS=50;TQSS=1;NT=ref;QSS_NT=50;TQSS_NT=1;SGT=GG->GT;DP=50;MQ=60.00;MQ0=0;ReadPosRankSum=2.05;SNVSB=0.00;SomaticEVS=19.84	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	20:0:0:0:0,0:0,0:20,20:0,0	30:0:0:0:0,0:0,0:20,20:10,10
+demo20	3537	.	C	T	.	PASS	SOMATIC;QSS=66;TQSS=1;NT=ref;QSS_NT=66;TQSS_NT=1;SGT=CC->CT;DP=55;MQ=60.00;MQ0=0;ReadPosRankSum=1.83;SNVSB=0.00;SomaticEVS=18.37	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	25:0:0:0:0,0:25,25:0,0:0,0	30:0:0:0:0,0:26,26:0,0:4,4
+demo20	3616	.	C	A	.	PASS	SOMATIC;QSS=66;TQSS=1;NT=ref;QSS_NT=66;TQSS_NT=1;SGT=CC->AC;DP=55;MQ=60.00;MQ0=0;ReadPosRankSum=2.74;SNVSB=0.00;SomaticEVS=19.98	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	32:0:0:0:0,0:31,31:0,0:1,1	23:0:0:0:7,7:16,16:0,0:0,0
+demo20	3777	.	T	C	.	PASS	SOMATIC;QSS=65;TQSS=1;NT=ref;QSS_NT=65;TQSS_NT=1;SGT=TT->CT;DP=64;MQ=60.00;MQ0=0;ReadPosRankSum=3.05;SNVSB=0.00;SomaticEVS=15.52	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	30:0:0:0:0,0:0,0:0,0:30,30	34:0:0:0:0,0:4,4:0,0:30,30
+demo20	3879	.	G	C	.	PASS	SOMATIC;QSS=79;TQSS=1;NT=ref;QSS_NT=79;TQSS_NT=1;SGT=GG->CG;DP=63;MQ=60.00;MQ0=0;ReadPosRankSum=1.02;SNVSB=0.00;SomaticEVS=19.98	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	33:0:0:0:0,0:1,1:32,32:0,0	30:0:0:0:0,0:9,9:21,21:0,0
+demo20	4056	.	A	T	.	PASS	SOMATIC;QSS=79;TQSS=1;NT=ref;QSS_NT=79;TQSS_NT=1;SGT=AA->AT;DP=54;MQ=60.00;MQ0=0;ReadPosRankSum=1.49;SNVSB=0.00;SomaticEVS=19.98	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	30:0:0:0:30,30:0,0:0,0:0,0	24:0:0:0:17,17:0,0:0,0:7,7
+demo20	4214	.	T	C	.	LowEVS	SOMATIC;QSS=77;TQSS=1;NT=ref;QSS_NT=77;TQSS_NT=1;SGT=TT->CT;DP=63;MQ=60.00;MQ0=0;ReadPosRankSum=0.90;SNVSB=6.08;SomaticEVS=5.40	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	26:0:0:0:0,0:0,0:0,0:26,26	37:0:0:0:0,0:9,9:0,0:28,28
+demo20	4425	.	G	A	.	LowEVS	SOMATIC;QSS=54;TQSS=1;NT=ref;QSS_NT=54;TQSS_NT=1;SGT=GG->AG;DP=47;MQ=60.00;MQ0=0;ReadPosRankSum=0.00;SNVSB=2.74;SomaticEVS=5.19	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	18:0:0:0:1,1:0,0:17,17:0,0	29:0:0:0:5,5:0,0:24,24:0,0
+demo20	4833	.	T	A	.	PASS	SOMATIC;QSS=65;TQSS=1;NT=ref;QSS_NT=65;TQSS_NT=1;SGT=TT->AT;DP=59;MQ=60.00;MQ0=0;ReadPosRankSum=2.22;SNVSB=0.00;SomaticEVS=16.97	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	21:0:0:0:0,0:0,0:0,0:21,21	38:0:0:0:5,5:0,0:0,0:33,33
+demo20	4931	.	C	A	.	LowEVS	SOMATIC;QSS=6;TQSS=1;NT=ref;QSS_NT=6;TQSS_NT=1;SGT=CC->AC;DP=17;MQ=60.00;MQ0=0;ReadPosRankSum=-0.28;SNVSB=0.00;SomaticEVS=4.05	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	6:0:0:0:0,0:6,6:0,0:0,0	11:0:0:0:7,7:4,4:0,0:0,0

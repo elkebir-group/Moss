@@ -16,6 +16,7 @@ Moss takes as input the BAM files of multiple samples and corresponding VCF outp
       * [Build from source](#compilation) (alternative)
           * [Dependencies](#dep)
           * [Compilation](#comp)
+      * [Docker image](#docker)
   2. [Usage instructions](#usage)
 
 <a name="install"></a>
@@ -77,22 +78,30 @@ make
 
 The compilation results in the executable `moss`.
 
+<a name="docker"></a>
+### Docker image
+
+The docker image is available on [Docker Hub](https://hub.docker.com/r/chuanyiz/moss).
+You can pull from Docker Hub by `docker pull chuanyiz/moss`.
+
 <a name="usage"></a>
 ## Usage instructions
 
 Moss works on top of other somatic variant calling methods, such as Strelka2 and Mutect2.
 We assume you have already run the base variant caller as their manual suggested and get the VCF files of each sample.
-Then run the python script `scripts/union_candidates.py` to generate a VCF file of candidates loci as an input to Moss. For example:
+Then run the python script `scripts/union_candidates.py` to generate a VCF file of candidates loci as an input to Moss. For example you can run the toy example in `data/`:
 
 ```bash
-python scripts/union_candidates.py -f <list_of_VCF.list> --normal-name <NORMAL> -t Mutect -o <output.vcf>
+cd data
+python ../scripts/union_candidates.py -f clones.list --normal-name sample0 -t strelka -o candidates.vcf
 ```
 
 To run Moss, you need a reference genome FASTA file, BAM files for normal and tumor samples, realigned BAM files (optional but recommended), and a candidate loci VCF.
-For example, after you've built `moss` in the `build/` directory, you can run the toy example in `data/`:
+For example, after you've built `moss` in the `build/` directory, you can continue the toy example in `data/`:
 
 ``` bash
-./moss -r ../data/demo20.fa -b ../data/normal.sort.bam -R ../data/empty.bam -b ../data/clone0.spike.sort.bam -R ../data/empty.bam -b ../data/clone1.spike.sort.bam -R ../data/empty.bam -b ../data/clone2.spike.sort.bam -R ../data/empty.bam -b ../data/clone3.spike.sort.bam -R ../data/empty.bam -l ../data/candidates.chrdemo20.vcf -m 4 -t -0.693 --ignore0 --grid-size 200 -o example.vcf
+cd build
+./moss -r ../data/demo20.fa -b ../data/normal.sort.bam -R ../data/empty.bam -b ../data/clone0.spike.sort.bam -R ../data/empty.bam -b ../data/clone1.spike.sort.bam -R ../data/empty.bam -b ../data/clone2.spike.sort.bam -R ../data/empty.bam -b ../data/clone3.spike.sort.bam -R ../data/empty.bam -l ../data/candidates.vcf -m 4 -t -0.693 --ignore0 --grid-size 200 -o example.vcf
 ```
 
 Finally, we filter the result VCF file:
