@@ -18,6 +18,8 @@ Moss takes as input the BAM files of multiple samples and corresponding VCF outp
           * [Compilation](#comp)
       * [Docker image](#docker)
   2. [Usage instructions](#usage)
+      * [Conda/compiled usages](#conda-usages)
+      * [Docker usages](#docker-usages)
 
 <a name="install"></a>
 
@@ -89,11 +91,15 @@ You can pull from Docker Hub by `docker pull chuanyiz/moss`.
 
 Moss works on top of other somatic variant calling methods, such as Strelka2 and Mutect2.
 We assume you have already run the base variant caller as their manual suggested and get the VCF files of each sample.
-Then run the python script `scripts/union_candidates.py` to generate a VCF file of candidates loci as an input to Moss. For example you can run the toy example in `data/`:
+
+<a name="conda-usages"></a>
+### Conda/compiled usages
+
+Firstly run the python script `scripts/union_candidates.py` to generate a VCF file of candidates loci as an input to Moss. For example you can run the toy example in `data/`:
 
 ```bash
 cd data
-python ../scripts/union_candidates.py -f clones.list --normal-name sample0 -t strelka -o candidates.vcf
+python ../scripts/union_candidates.py -f samples.list --normal-name sample0 -t strelka -o candidates.vcf
 ```
 
 To run Moss, you need a reference genome FASTA file, BAM files for normal and tumor samples, realigned BAM files (optional but recommended), and a candidate loci VCF.
@@ -101,7 +107,7 @@ For example, after you've built `moss` in the `build/` directory, you can contin
 
 ``` bash
 cd build
-./moss -r ../data/demo20.fa -b ../data/normal.sort.bam -R ../data/empty.bam -b ../data/clone0.spike.sort.bam -R ../data/empty.bam -b ../data/clone1.spike.sort.bam -R ../data/empty.bam -b ../data/clone2.spike.sort.bam -R ../data/empty.bam -b ../data/clone3.spike.sort.bam -R ../data/empty.bam -l ../data/candidates.vcf -m 4 -t -0.693 --ignore0 --grid-size 200 -o example.vcf
+./moss -r ../data/demo20.fa -b ../data/normal.sort.bam -R ../data/empty.bam -b ../data/sample0.spike.sort.bam -R ../data/empty.bam -b ../data/sample1.spike.sort.bam -R ../data/empty.bam -b ../data/sample2.spike.sort.bam -R ../data/empty.bam -b ../data/sample3.spike.sort.bam -R ../data/empty.bam -l ../data/candidates.vcf -m 4 -t -0.693 --ignore0 --grid-size 200 -o example.vcf
 ```
 
 Finally, we filter the result VCF file:
@@ -110,4 +116,14 @@ Finally, we filter the result VCF file:
 bgzip example.vcf
 tabix example.vcf.gz
 python ../scripts/post_filter.py --normal-name sample0 -i example.vcf.gz -o example.post_filter.vcf
+```
+<a name="docker-usages"></a>
+### Docker usages
+
+Organize your data in the same structure as the `data/` folder.
+Modify the `config.yaml` following the instructions within the file, and it will be used to generate the commands for Moss within the container.
+When you start the docker container, you need to bind-mount the data folder by argument `-v path:/moss_data:`, where `path` represents the _absolute_ path to your data folder in the host, and `/moss_data` is the mounted location in the container.
+
+```bash
+docker run -it -v path:/moss_data: chuanyiz/moss /bin/bash -c "python /moss_scripts/run_moss.py -c /moss_data/config.yaml -o /moss_data/run_moss.sh && bash /moss_data/run_moss.sh"
 ```
